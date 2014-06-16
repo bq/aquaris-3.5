@@ -25,11 +25,12 @@
 
 #include <mach/dma.h>
 #include <mach/irqs.h>
+#include <mach/m4u.h>
 #include "mach/mt_boot.h"
 
 #include "debug.h"
 #include "disp_drv.h"
-#include <disp_drv_platform.h>
+#include "disp_drv_platform.h"
 #include "disp_drv_log.h"
 #include "dpi_drv.h"
 #include "lcd_drv.h"
@@ -41,7 +42,6 @@
 #include "mtkfb_console.h"
 #include "mtkfb_info.h"
 #include "ddp_ovl.h"
-#include "m4u.h"
 
 unsigned int EnableVSyncLog = 0;
 
@@ -173,6 +173,17 @@ static int mtkfb_update_screen(struct fb_info *info);
 static void mtkfb_update_screen_impl(void);
 extern int is_pmem_range(unsigned long* base, unsigned long size);
 unsigned int mtkfb_fm_auto_test(void);
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void mtkfb_early_suspend(struct early_suspend *h);
+static void mtkfb_late_resume(struct early_suspend *h);
+static struct early_suspend mtkfb_early_suspend_handler = 
+{
+    .level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+    .suspend = mtkfb_early_suspend,
+    .resume = mtkfb_late_resume,
+};
+#endif
 
 static int mtkfb_set_s3d_ftm(struct fb_info *info, unsigned int mode);
 #if defined(MTK_HDMI_SUPPORT) ||defined (MTK_WFD_SUPPORT)
@@ -2312,19 +2323,9 @@ static int mtkfb_ioctl(struct file *file, struct fb_info *info, unsigned int cmd
     case MTKFB_POWEROFF:
     { 
         MTKFB_INFO("MTKFB_POWEROFF\n");
-        if(is_early_suspended) return r;
-        if (down_interruptible(&sem_early_suspend)) 
-        {
-            printk("[FB Driver] can't get semaphore in mtkfb_early_suspend()\n");
-            return -ERESTARTSYS;
-        }
-        
-        is_early_suspended = TRUE;
-        
-        DISP_CHECK_RET(DISP_PanelEnable(FALSE));
-        DISP_CHECK_RET(DISP_PowerEnable(FALSE));
-        
-        up(&sem_early_suspend);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+        mtkfb_early_suspend(&mtkfb_early_suspend_handler);
+#endif
         
         return r;
     }
@@ -2332,19 +2333,9 @@ static int mtkfb_ioctl(struct file *file, struct fb_info *info, unsigned int cmd
     case MTKFB_POWERON:
     {
         MTKFB_INFO("MTKFB_POWERON\n");
-        //		if(!is_early_suspended) return r;
-        if (down_interruptible(&sem_early_suspend)) 
-        {
-            printk("[FB Driver] can't get semaphore in mtkfb_late_resume()\n");
-            return -ERESTARTSYS;
-        }
-        
-        DISP_CHECK_RET(DISP_PowerEnable(TRUE));
-        DISP_CHECK_RET(DISP_PanelEnable(TRUE));
-        
-        is_early_suspended = FALSE;
-        
-        up(&sem_early_suspend);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+        mtkfb_late_resume(&mtkfb_early_suspend_handler);
+#endif
         
         return r;
     }
@@ -3745,7 +3736,12 @@ static int mtkfb_probe(struct device *dev)
         ASSERT(DISP_GetVRamSize() <= (res->end - res->start + 1));
         if (mtkfb_enable_m4u)
         {
+#if defined(MTK_M4U_EXT_PAGE_TABLE)
+            m4u_fill_linear_pagetable((unsigned int)fbdev->fb_pa_base, DISP_GetVRamSize());
+            fb_pa = (unsigned int)fbdev->fb_pa_base;
+#else
             m4u_alloc_mva(M4U_CLNTMOD_LCDC_UI, (unsigned int)fbdev->fb_pa_base, DISP_GetVRamSize(), 0, 0, &fb_pa);
+#endif
             ASSERT(fb_pa);
             printk("[MTKFB] FB MVA is 0x%08X PA is 0x%08X\n", fb_pa, (unsigned int)fbdev->fb_pa_base);
         }
@@ -3888,10 +3884,19 @@ static void mtkfb_shutdown(struct device *pdev)
     sem_early_suspend_cnt--;
     
     is_early_suspended = TRUE;
+    DISP_PrepareSuspend();
+    // Wait for disp finished.
+    if (wait_event_interruptible_timeout(disp_done_wq, !disp_running, HZ/10) == 0)
+    {
+        printk("[FB Driver] Wait disp finished timeout in early_suspend\n");
+    }
     DISP_CHECK_RET(DISP_PanelEnable(FALSE));
     DISP_CHECK_RET(DISP_PowerEnable(FALSE));
     
     DISP_CHECK_RET(DISP_PauseVsync(TRUE));
+    #ifdef MT65XX_NEW_DISP
+        disp_path_clock_off("reg_backup");
+    #endif
     sem_early_suspend_cnt++;
     up(&sem_early_suspend);
 
@@ -4169,15 +4174,6 @@ static struct platform_driver mtkfb_driver =
 		.shutdown = mtkfb_shutdown,
     },    
 };
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static struct early_suspend mtkfb_early_suspend_handler = 
-{
-	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
-	.suspend = mtkfb_early_suspend,
-	.resume = mtkfb_late_resume,
-};
-#endif
 
 #ifdef DEFAULT_MMP_ENABLE
 void MMProfileEnable(int enable);

@@ -119,7 +119,9 @@ typedef struct _cmd_op_map{
 AP_IMG_TYPE get_ap_img_ver(void);
 int get_td_eint_info(int md_id, char * eint_name, unsigned int len);
 int get_md_gpio_info(int md_id, char *gpio_name, unsigned int len);
+int get_md_gpio_val(int md_id, unsigned int num);
 int get_md_adc_info(int md_id, char *adc_name, unsigned int len);
+int get_md_adc_val(int md_id, unsigned int num);
 int get_dram_type_clk(int *clk, int *type);
 int get_eint_attr(char *name, unsigned int name_len, unsigned int type, char * result, unsigned int *len);
 int get_bat_info(unsigned int para);
@@ -128,6 +130,8 @@ int get_bat_info(unsigned int para);
 unsigned int get_nr_modem(void);
 unsigned int *get_modem_size_list(void);
 int parse_ccci_dfo_setting(void *dfo_data, int num);
+int parse_meta_md_setting(unsigned char args[]);
+
 unsigned int get_md_mem_start_addr(int md_id);
 unsigned int get_md_share_mem_start_addr(int md_id);
 unsigned int get_smem_base_addr(int md_id);

@@ -76,6 +76,7 @@
 #include <string.h>
 #include <math.h>
 #include <cutils/properties.h>
+#include <linux/delay.h>
 
 extern "C" {
 #include <linux/kd.h>
@@ -86,6 +87,8 @@ extern "C" {
 #include <linux/ioctl.h>
 #include <linux/videodev2.h>
 #include <linux/fb.h>
+
+
 #include "mtkfb.h"
 }
 
@@ -650,6 +653,46 @@ MINT32 surfaceView::setOverlayBuf(
     ACDK_LOGD("-");
     return status;
 }     
+
+/*******************************************************************************
+*
+********************************************************************************/   
+
+MINT32 surfaceView::disableLayer(MUINT32 const layerNo)
+{
+    ACDK_LOGD("layerNo(%d)",layerNo);
+
+    if(g_overlayFlag == 0)
+    {
+        ACDK_LOGD_DYN(g_overlayDebug,"use overlay");
+
+        if (layerNo > mTotalLayerNum) 
+        {
+            ACDK_LOGE("error layerNo(%d)", layerNo); 
+            return ACDK_RETURN_INVALID_PARA;         
+        }
+
+        mLayerInfo[0].layer_id = 1;
+        mLayerInfo[0].layer_enable = 0;
+        
+        if (ioctl(mFBfd, MTKFB_SET_VIDEO_LAYERS, &mLayerInfo[0]) < 0) 
+        {
+            ACDK_LOGE("MTKFB_SET_VIDEO_LAYERS failed");
+            return ACDK_RETURN_API_FAIL; 
+        }    
+		usleep(50000);
+
+    }
+    else
+    {
+        ACDK_LOGD_DYN(g_overlayDebug,"use mmap");
+        memset(m_pFrameBuf, 0, mFBBufferSize * 2);
+    }
+
+    ACDK_LOGD_DYN(g_overlayDebug,"-");
+    return ACDK_RETURN_NO_ERROR;
+}
+
  
 /*******************************************************************************
 *
@@ -667,7 +710,6 @@ MINT32 surfaceView::resetLayer(MUINT32 const layerNo)
             ACDK_LOGE("error layerNo(%d)", layerNo); 
             return ACDK_RETURN_INVALID_PARA;         
         }
-
         mLayerInfo[0].layer_id = 1;
         mLayerInfo[0].layer_enable = 0;
         

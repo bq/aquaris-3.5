@@ -31,7 +31,9 @@
 //-------------feature enable/disable configure----------------//
 //#define FEATURE_GET_TD_EINT_NUM
 #define FEATURE_GET_MD_GPIO_NUM		//disable for bring up
+#define FEATURE_GET_MD_GPIO_VAL		//disable for bring up
 #define FEATURE_GET_MD_ADC_NUM
+#define FEATURE_GET_MD_ADC_VAL		//disable for bring up
 #define FEATURE_GET_MD_EINT_ATTR		//disable for bring up	
 //#define FEATURE_GET_DRAM_TYPE_CLK
 //#define FEATURE_MD_FAST_DORMANCY
@@ -135,6 +137,10 @@ extern unsigned long *get_modem_start_addr_list(void);
 
 #if defined (FEATURE_GET_MD_ADC_NUM)
 extern int IMM_get_adc_channel_num(char *channel_name, int len);
+#endif
+
+#if defined (FEATURE_GET_MD_ADC_VAL)
+extern int IMM_GetOneChannelValue(int dwChannel, int data[4], int* rawdata);
 #endif
 
 #if defined (FEATURE_GET_DRAM_TYPE_CLK)
@@ -563,7 +569,19 @@ int get_md_gpio_info(int md_id, char *gpio_name, unsigned int len)
 	#endif
 }
 EXPORT_SYMBOL(get_md_gpio_info);
+
+
+int get_md_gpio_val(int md_id, unsigned int num)
+{
+	#if defined (FEATURE_GET_MD_GPIO_VAL)
+	return mt_get_gpio_in(num);
 	
+	#else
+	return -1;
+	#endif
+}
+EXPORT_SYMBOL(get_md_gpio_val);
+
 
 int get_md_adc_info(int md_id, char *adc_name, unsigned int len)
 {
@@ -575,6 +593,26 @@ int get_md_adc_info(int md_id, char *adc_name, unsigned int len)
 	#endif
 }
 EXPORT_SYMBOL(get_md_adc_info);
+
+
+int get_md_adc_val(int md_id, unsigned int num)
+{
+	int data[4] = {0,0,0,0};
+	int val = 0;
+	int ret = 0;
+	
+	#if defined (FEATURE_GET_MD_ADC_VAL)
+	ret = IMM_GetOneChannelValue(num, data, &val);
+	if (ret == 0)
+		return val;
+	else
+		return ret;
+	
+	#else
+	return -1;
+	#endif
+}
+EXPORT_SYMBOL(get_md_adc_val);
 
 
 int get_eint_attr(char *name, unsigned int name_len, unsigned int type, char * result, unsigned int *len)

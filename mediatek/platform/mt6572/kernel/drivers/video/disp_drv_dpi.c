@@ -229,6 +229,21 @@ static DISP_STATUS dpi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
     if (!disp_drv_dpi_init_context()) 
         return DISP_STATUS_NOT_IMPLEMENTED;
 
+    init_mipi_pll();
+    init_io_pad();
+    init_io_driving_current();
+
+    init_lcd();
+    if (isLcmInited)
+    {
+        is_video_mode_running = true;
+    }
+    init_dpi(isLcmInited);
+
+    if (NULL != lcm_drv->init && !isLcmInited) {
+        lcm_drv->init();
+    }
+
 #ifndef MT65XX_NEW_DISP
     init_intermediate_buffers(fbPA);
 #else
@@ -247,42 +262,6 @@ static DISP_STATUS dpi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
         config.srcROI.x = 0;config.srcROI.y = 0;
         config.srcROI.height= DISP_GetScreenHeight();config.srcROI.width= DISP_GetScreenWidth();
         config.ovl_config.source = OVL_LAYER_SOURCE_MEM; 
-    
-        // Disable FB layer (Layer3)
-        {
-            config.ovl_config.layer = FB_LAYER;
-            config.ovl_config.layer_en = 0;
-            disp_path_get_mutex();
-            disp_path_config_layer(&config.ovl_config);
-            disp_path_release_mutex();
-            disp_path_wait_reg_update();
-        }
-
-        // Disable LK UI layer (Layer2)
-        {
-            config.ovl_config.layer = FB_LAYER-1;
-            config.ovl_config.layer_en = 0;
-            disp_path_get_mutex();
-            disp_path_config_layer(&config.ovl_config);
-            disp_path_release_mutex();
-            disp_path_wait_reg_update();
-        }
-
-#if 1  // defined(MTK_M4U_SUPPORT)
-        // Config FB_Layer port to be physical.
-        {
-            M4U_PORT_STRUCT portStruct;
-
-            portStruct.ePortID = M4U_PORT_LCD_OVL;		   //hardware port ID, defined in M4U_PORT_ID_ENUM
-            portStruct.Virtuality = 1;
-            portStruct.Security = 0;
-            portStruct.domain = 3;			  //domain : 0 1 2 3
-            portStruct.Distance = 1;
-            portStruct.Direction = 0;
-            m4u_config_port(&portStruct);
-        }
-        // Reconfig FB_Layer and enable it.
-#endif
 
         config.ovl_config.layer = FB_LAYER;
         config.ovl_config.layer_en = 1;
@@ -302,6 +281,10 @@ static DISP_STATUS dpi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
         config.ovl_config.key = 0xFF;	   // color key
         config.ovl_config.aen = 0;			  // alpha enable
         config.ovl_config.alpha = 0;
+
+        config.dstModule = DISP_MODULE_DPI0;
+        config.outFormat = RDMA_OUTPUT_FORMAT_ARGB; 
+
         LCD_LayerSetAddress(FB_LAYER, fbPA);
         LCD_LayerSetFormat(FB_LAYER, LCD_LAYER_FORMAT_RGB565);
         LCD_LayerSetOffset(FB_LAYER, 0, 0);
@@ -309,31 +292,66 @@ static DISP_STATUS dpi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
         LCD_LayerSetPitch(FB_LAYER, ALIGN_TO(DISP_GetScreenWidth(),32) * 2);
         LCD_LayerEnable(FB_LAYER, TRUE);
 
-        config.dstModule = DISP_MODULE_DPI0;// DISP_MODULE_WDMA1
-        config.outFormat = RDMA_OUTPUT_FORMAT_ARGB;
+        {
+            #define TIMECNT  1000000
+            unsigned int reg1 = 0, reg2 = 0, reg3 = 0;
+            unsigned int timeout_cnt = 0;
+            unsigned int irq_mask;
 
-        disp_path_get_mutex();
+            // dump before modification
+            printk("[DISP] pa:0x%x, va:0x%x \n", fbPA, fbVA);		
+            
+            // enable frame done interrupt
+            disp_path_get_mutex();
+            OVLEnableIrq(0x2);
+            disp_path_release_mutex();
+            
+            while (timeout_cnt < TIMECNT)
+            {
+                reg1 = DISP_REG_GET(DISP_REG_OVL_INTSTA);
+                reg2 = DISP_REG_GET(DISP_REG_OVL_STA);
+                // frame done interrupt
+                if (((reg1 & 0x2) == 0x2) && ((reg2 & 0x1) == 0x0))
+                {
+                    DISP_REG_SET(DISP_REG_OVL_INTSTA, ~reg1);     
 
-        disp_path_config(&config);
-        disp_bls_config();
+                    local_irq_save(irq_mask);
+                    disp_path_get_mutex();
+                    disp_path_config(&config);
+                    disp_path_release_mutex();
 
-        disp_path_release_mutex();
+                    #if 1  // defined(MTK_M4U_SUPPORT)
+                    {
+                        M4U_PORT_STRUCT portStruct;
+                        
+                        portStruct.ePortID = M4U_PORT_LCD_OVL;		   //hardware port ID, defined in M4U_PORT_ID_ENUM
+                        portStruct.Virtuality = 1;
+                        portStruct.Security = 0;
+                        portStruct.domain = 3;			  //domain : 0 1 2 3
+                        portStruct.Distance = 1;
+                        portStruct.Direction = 0;
+                        m4u_config_port(&portStruct);
+                    }
+                    // hook m4u debug callback function
+                    m4u_set_tf_callback(M4U_CLNTMOD_DISP, &disp_m4u_dump_reg);
+                    #endif
+                    local_irq_restore(irq_mask);
+
+                    break;
+                }
+                timeout_cnt++;
+            }
+            // sw timeout
+            if (timeout_cnt >= TIMECNT)
+            {
+                printk("[DISP] timeout:%d \n", timeout_cnt);		
+                ASSERT(0);
+            }
+            // dump after modification
+            printk("[DISP] cnt:%d \n", timeout_cnt);		
+        }
     }
 #endif
-    init_mipi_pll();
-    init_io_pad();
-    init_io_driving_current();
-
-    init_lcd();
-    if (isLcmInited)
-    {
-        is_video_mode_running = true;
-    }
-    init_dpi(isLcmInited);
-
-    if (NULL != lcm_drv->init && !isLcmInited) {
-        lcm_drv->init();
-    }
 
     return DISP_STATUS_OK;
 }
@@ -346,7 +364,7 @@ static DISP_STATUS dpi_enable_power(BOOL enable)
         // initialize MIPI PLL
         DPI_CHECK_RET(DPI_MIPI_PowerOn());
         init_mipi_pll();
-        DPI_mipi_switch(true); 
+        DPI_mipi_switch(TRUE, lcm_params); 
 
         // enable MMSYS CG
         init_io_pad();
@@ -377,7 +395,7 @@ static DISP_STATUS dpi_enable_power(BOOL enable)
         LCD_CHECK_RET(LCD_PowerOff());
 
         // disable MIPI PLL
-        DPI_mipi_switch(false);
+        DPI_mipi_switch(FALSE, lcm_params);
         DPI_CHECK_RET(DPI_MIPI_PowerOff());
     }
 

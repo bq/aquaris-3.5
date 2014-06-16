@@ -51,10 +51,8 @@ int BWC::smi_bw_ctrl_set( BWC_PROFILE_TYPE profile_type , BWC_VCODEC_TYPE codec_
         switch( profile_type )
         {
         case BWCPT_VIDEO_RECORD_CAMERA:
-            cfg.scenario = SMI_BWC_SCEN_VRCAMERA1066;
-            cfg.b_reduce_command_buffer = 1;
-            break;
         case BWCPT_VIDEO_RECORD:
+        case BWCPT_VIDEO_SNAPSHOT:
             cfg.scenario = SMI_BWC_SCEN_VR1066;
             cfg.b_reduce_command_buffer = 1;
             break;

@@ -48,6 +48,8 @@
 //AEON add by hongle
 #define FEATURE_FTM_VERSION
 #define FEATURE_FTM_STROBE
+#define FEATURE_FTM_ACSLB
+#define FEATURE_FTM_PHONE_MIC_HEADSET_LOOPBACK
 
 #include "cust_font.h"		/* common part */
 #include "cust_keys.h"		/* custom part */

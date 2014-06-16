@@ -3,13 +3,18 @@
 #include <linux/ioctl.h>
 #include <linux/fs.h>
 
+//#define MTK_M4U_EXT_PAGE_TABLE
 
 #define M4U_PAGE_SIZE    0x1000                                  //4KB
 
 #define M4U_CLIENT_MODULE_NUM        M4U_CLNTMOD_MAX
 #define TOTAL_MVA_RANGE   0x20000000   //0x40000000                              //total virtual address range: 1GB
 
+#ifdef MTK_M4U_EXT_PAGE_TABLE
+#define PT_TOTAL_ENTRY_NUM    (1*1024*1024)                                    //4G page table entries
+#else
 #define PT_TOTAL_ENTRY_NUM    (TOTAL_MVA_RANGE/DEFAULT_PAGE_SIZE)              //total page table entries
+#endif
 
 #define M4U_GET_PTE_OFST_TO_PT_SA(MVA)    (((MVA) >> 12) << 2)
 
@@ -255,6 +260,11 @@ void m4u_dump_pagetable(const M4U_MODULE_ID_ENUM eModuleID);
 void m4u_dump_pagetable_nearby(const M4U_MODULE_ID_ENUM eModuleID, const unsigned int mva_addr);
 int m4u_power_on();
 int m4u_power_off();
+
+#ifdef MTK_M4U_EXT_PAGE_TABLE
+int m4u_fill_linear_pagetable(unsigned int pa, unsigned int size);
+int m4u_erase_linear_pagetable(unsigned int pa, unsigned int size);
+#endif
 
 int m4u_alloc_mva(const M4U_MODULE_ID_ENUM eModuleID, 
                       const unsigned int BufAddr, 

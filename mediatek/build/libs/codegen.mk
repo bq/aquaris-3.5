@@ -29,10 +29,7 @@ MTK_CGEN_AP_Editor_DB_Enum_File	:= $(MTK_CGEN_OUT_DIR)/APDB_$(MTK_PLATFORM)_$(MT
 
 MTK_CGEN_COMPILE_OPTION := $(call mtk.custom.generate-macros)
 MTK_CGEN_hardWareVersion := $(MTK_PLATFORM)_$(MTK_CHIP_VER)
-MTK_CGEN_SWVersion := $(shell cat mediatek/config/common/ProjectConfig.mk | grep "^\s*MTK_BUILD_VERNO" | sed 's/.*\s*=\s*//g')
-ifeq ($(strip $(MTK_CGEN_SWVersion)),)
-  MTK_CGEN_SWVersion := $(MTK_BUILD_VERNO)
-endif
+MTK_CGEN_SWVersion := V1.0.1
 
 ifneq ($(MTK_DEPENDENCY_AUTO_CHECK), true)
 .PHONY: $(MTK_CGEN_APDB_SourceFile)

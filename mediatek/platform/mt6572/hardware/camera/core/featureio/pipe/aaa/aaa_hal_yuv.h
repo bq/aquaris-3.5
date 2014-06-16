@@ -150,6 +150,7 @@ public:
     virtual MINT32 updateCaptureParams(CaptureParam_T &a_rCaptureInfo);
     virtual MVOID endContinuousShotJobs();
     virtual MINT32 enableAELimiterControl(MBOOL  bIsAELimiter);
+    virtual MINT32 isNeedFiringFlash();
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  Implementation
@@ -231,7 +232,8 @@ private:
     MUINT32       m_preflashFrmCnt;
     MUINT32       m_strobeWidth;
     MBOOL         m_bFlashActive;
-
+    MBOOL         m_isFlashOnCapture;
+    MBOOL         m_bExifFlashOn;
 
 private:
     MBOOL setAeLock(MBOOL bLock);
@@ -256,6 +258,7 @@ private:
 
     MINT32 setFlashMode(MINT32 mode);
     MINT32 isAEFlashOn();
+    MINT32 setAFLampOnOff(MBOOL bOnOff);
     double AEFlashlightLog2(double x);
     double calcBV();    
     MINT32 queryAEFlashlightInfoFromSensor();

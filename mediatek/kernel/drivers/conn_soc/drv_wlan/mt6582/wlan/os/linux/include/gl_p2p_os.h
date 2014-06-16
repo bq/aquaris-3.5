@@ -168,6 +168,12 @@ glRegisterP2P(
     BOOLEAN fgIsApMode
     );
 
+void
+p2pEalySuspendReg (
+	P_GLUE_INFO_T prGlueInfo,
+	BOOLEAN fgIsEnable
+);
+
 BOOLEAN
 glUnregisterP2P(
     P_GLUE_INFO_T prGlueInfo

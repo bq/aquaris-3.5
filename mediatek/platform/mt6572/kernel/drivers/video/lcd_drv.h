@@ -4,7 +4,7 @@
 #ifdef BUILD_UBOOT
     #include <asm/arch/disp_drv_platform.h>
 #else
-    #include <disp_drv_platform.h>
+    #include "disp_drv_platform.h"
 #endif
 #include "disp_drv.h"
 #include "lcm_drv.h"

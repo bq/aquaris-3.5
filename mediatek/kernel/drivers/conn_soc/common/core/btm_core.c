@@ -529,8 +529,10 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 				if(loop_cnt2 > 10)
 					goto paged_dump_end;
 			}
-			_stp_set_host_dump_state(STP_HOST_DUMP_NOT_START);
+			
 paged_dump_end:
+			_stp_set_host_dump_state(STP_HOST_DUMP_NOT_START);
+			
             if(counter * 100 > STP_PAGED_DUMP_TIME_LIMIT)
             {
     			isEnd = _stp_get_dump_info(EXP_APMEM_CTRL_CHIP_PAGED_DUMP_END);
@@ -551,6 +553,7 @@ paged_dump_end:
                 {    			
                     STP_BTM_ERR_FUNC("paged dump fail\n");
                     _stp_set_host_dump_state(STP_HOST_DUMP_NOT_START);
+					stp_dbg_poll_cpupcr(5,5,0);
 					counter = 0;
                     ret = -1;
                     break;
@@ -718,8 +721,9 @@ full_dump_end:
 			/*move parser fw assert infor to paged dump in the one paged dump*/
 			//ret = stp_dbg_set_fw_info(&g_paged_trace_buffer[0],g_paged_trace_len,issue_type);
 			ret = 0;
-			mtk_wcn_stp_ctx_restore();
+
 		}while(0);
+		mtk_wcn_stp_ctx_restore();
 		break;
 #if 0
 		case STP_OPID_BTM_FORCE_FW_ASSERT:

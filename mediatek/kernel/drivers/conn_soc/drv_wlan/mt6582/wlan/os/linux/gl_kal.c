@@ -2523,11 +2523,16 @@ kalIoctl (IN P_GLUE_INFO_T    prGlueInfo,
     OUT PUINT_32                pu4QryInfoLen
     )
 {
+    extern BOOLEAN fgIsResetting;
     P_GL_IO_REQ_T prIoReq = NULL;
     WLAN_STATUS ret = WLAN_STATUS_SUCCESS;
 
     
-    //GLUE_SPIN_LOCK_DECLARATION();
+    if (fgIsResetting == TRUE)
+        return WLAN_STATUS_SUCCESS;
+
+
+		//GLUE_SPIN_LOCK_DECLARATION();
     ASSERT(prGlueInfo);
 
 

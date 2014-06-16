@@ -92,6 +92,10 @@ static bool rtc_gpio_init(void);
 static bool rtc_android_init(void);
 static bool rtc_lpd_init(void);
 static bool Writeif_unlock(void);
+#ifdef RTC_2SEC_REBOOT_ENABLE
+static bool rtc_2sec_stat_clear(void);
+void rtc_enable_2sec_reboot(void);
+#endif
 
 #if defined (MTK_KERNEL_POWER_OFF_CHARGING)
 extern kal_bool kpoc_flag ;
@@ -178,9 +182,14 @@ static U16 get_frequency_meter(U16 val, U16 measureSrc, U16 window_size)
 	if(val!=0)
 		rtc_xosc_write(val);
 
+	RTC_Write(FQMTR_CON0, 0x0000); //disable freq. meter, gated src clock
+	RTC_Write(TOP_CKPDN1, RTC_Read(TOP_CKPDN1)|0x20); //TOP_CKPDN1[5]=1, gated fixed clock
+
 	RTC_Write(TOP_RST_CON, 0x0100);			//FQMTR reset
 	while( !(RTC_Read(FQMTR_CON2)==0) && (0x8&RTC_Read(FQMTR_CON0))==0x8);
 	RTC_Write(TOP_RST_CON, 0x0000);			//FQMTR normal
+
+	RTC_Write(TOP_CKPDN1, RTC_Read(TOP_CKPDN1)&0xffdf); //TOP_CKPDN1[5]=0, turn on fixed clock
 
 	RTC_Write(FQMTR_CON1, window_size); //set freq. meter window value (0=1X32K(fix clock))
 	RTC_Write(FQMTR_CON0, 0x8000 | measureSrc); //enable freq. meter, set measure clock to 26Mhz
@@ -455,6 +464,10 @@ static bool rtc_android_init(void)
 
 	RTC_Write(RTC_DIFF, 0);
 	RTC_Write(RTC_CALI, 0);
+#ifdef RTC_2SEC_REBOOT_ENABLE
+	if (!rtc_2sec_stat_clear())
+		return false;
+#endif
 	if (!Write_trigger())
 		return false;
 
@@ -618,7 +631,7 @@ static void rtc_bbpu_power_down(void)
 
 void rtc_bbpu_power_on(void)
 {
-	U16 bbpu;
+	U16 bbpu,pdn2;
 
 	/* pull PWRBB high */
 #if RTC_RELPWR_WHEN_XRST
@@ -629,6 +642,17 @@ void rtc_bbpu_power_on(void)
 	RTC_Write(RTC_BBPU, bbpu);
 	Write_trigger();
 	print("[RTC] rtc_bbpu_power_on done\n");
+#ifdef RTC_2SEC_REBOOT_ENABLE	
+	rtc_enable_2sec_reboot();
+	//clear IPO shutdown block auto reboot pdn
+	//if IPO shutdown pdn set. rtc_2sec_reboot_check() return false, 
+	//which means must be other boot reason, cause preloader call rtc_bbpu_power_on()
+	pdn2 = RTC_Read(RTC_PDN2) & ~(0x1 << 7); 
+	RTC_Write(RTC_PDN2, pdn2);
+	Write_trigger();
+#else
+	RTC_Write(RTC_CALI, RTC_Read(RTC_CALI) & ~RTC_CALI_BBPU_2SEC_EN);
+#endif
 }
 
 void rtc_mark_bypass_pwrkey(void)
@@ -767,7 +791,13 @@ bool rtc_boot_check(void)
 		RTC_Write(RTC_SPAR0, (spar0 & 0xffbf) );
 	}
 	Write_trigger();
-
+	
+#ifdef RTC_2SEC_REBOOT_ENABLE
+	//after unlock, save the 2sec stat and clear(need unlock)
+	//save and clear the stat before alarm IRQ check, 
+	//otherwise platform.c return directly, not clear the 2sec stat
+	rtc_save_2sec_stat();
+#endif //#ifdef RTC_2SEC_REBOOT_ENABLE
 
 	irqsta = RTC_Read(RTC_IRQ_STA);	/* Read clear */
 	pdn1 = RTC_Read(RTC_PDN1);
@@ -890,41 +920,81 @@ void pl_power_off(void)
 	while (1);
 }
 
-static void rtc_2sec_stat_clear(void)
+#ifdef RTC_2SEC_REBOOT_ENABLE
+static bool g_rtc_2sec_stat;
+
+static bool rtc_2sec_stat_clear(void)
 {
-	RTC_Write(RTC_CALI, RTC_Read(RTC_CALI) & ~RTC_CALI_BBPU_2SEC_STAT_CLR);
-	Write_trigger();
-	RTC_Write(RTC_CALI, RTC_Read(RTC_CALI) | RTC_CALI_BBPU_2SEC_STAT_CLR);
-	Write_trigger();
-	RTC_Write(RTC_CALI, RTC_Read(RTC_CALI) & ~RTC_CALI_BBPU_2SEC_STAT_CLR);
-	Write_trigger();
+	print("rtc_2sec_stat_clear\n");
+	RTC_Write(RTC_CALI, RTC_Read(RTC_CALI) & ~RTC_CALI_BBPU_2SEC_STAT);
+	if (!Write_trigger())
+		return false;
+	RTC_Write(RTC_CALI, RTC_Read(RTC_CALI) | RTC_CALI_BBPU_2SEC_STAT);
+	if(!Write_trigger())
+		return false;
+	RTC_Write(RTC_CALI, RTC_Read(RTC_CALI) & ~RTC_CALI_BBPU_2SEC_STAT);
+	if(!Write_trigger())
+		return false;
+	
+	return true;
 }
 
-bool rtc_2sec_reboot_check(void)
+void rtc_save_2sec_stat(void)
 {
-	U16 cali;
+	U16 cali, pdn2;
+	static bool save_stat=false;
+	
+	if(save_stat==true)
+		return;
+	else	
+		save_stat = true;
 	
 	cali = RTC_Read(RTC_CALI);
+	print("rtc_2sec_reboot_check cali=%d\n", cali);
 	if (cali & RTC_CALI_BBPU_2SEC_EN) {
-		switch(cali & RTC_CALI_BBPU_2SEC_MODE) {
+		switch((cali & RTC_CALI_BBPU_2SEC_MODE_MSK) >> RTC_CALI_BBPU_2SEC_MODE_SHIFT) {
 			case 0:
 			case 1:
 			case 2:
 				if(cali & RTC_CALI_BBPU_2SEC_STAT) {
 					rtc_2sec_stat_clear();
-					return true;
+					pdn2 = RTC_Read(RTC_PDN2);
+					if(pdn2 & (0x1 << 7)) //IPO set shutdown
+					{
+						print("rtc IPO shutdown disable auto reboot\n");
+						g_rtc_2sec_stat = false;
+					}
+					else
+						g_rtc_2sec_stat = true;
 				} else {
 					rtc_2sec_stat_clear();
-					return false;
+					g_rtc_2sec_stat = false;
 				}
 				break;
 			case 3:
 				rtc_2sec_stat_clear();
-				return true;
+				g_rtc_2sec_stat = true;
 			default:
 				break;		
 		}
 	}
 }
 
+bool rtc_2sec_reboot_check(void)
+{
+	return g_rtc_2sec_stat;
+}
+
+void rtc_enable_2sec_reboot(void)
+{
+	U16 cali;
+	U16 bbpu;
+	
+	
+	cali = RTC_Read(RTC_CALI) | RTC_CALI_BBPU_2SEC_EN;
+	cali = (cali & ~(RTC_CALI_BBPU_2SEC_MODE_MSK)) | (RTC_2SEC_MODE << RTC_CALI_BBPU_2SEC_MODE_SHIFT);
+	RTC_Write(RTC_CALI, cali);
+	Write_trigger();
+}
+#endif //#ifdef RTC_2SEC_REBOOT_ENABLE
 #endif //#if defined(CFG_FPGA_PLATFORM)

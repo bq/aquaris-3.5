@@ -126,7 +126,7 @@ namespace NSACDK
                 *@return
                 *-0 indicates success, otherwise indicates fail
               */
-        virtual MINT32 stopPreview() = 0;
+        virtual MINT32 stopPreview(MUINT32 para) = 0;
 
         /**                       
                 *@brief Capture

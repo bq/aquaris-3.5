@@ -26,12 +26,10 @@
 #include <mach/mt_clkmgr.h>
 #endif
 
-#include <cust_gpio_usage.h>
+#include <mach/mt_gpio.h>
 
 #if defined(GPIO_SDHC_EINT_PIN)
-#if (GPIO_SDHC_EINT_PIN == GPIO86)
 extern msdc_disable_eint_while_suspend;
-#endif
 #endif
 
 #ifdef MTK_IO_PERFORMANCE_DEBUG
@@ -1564,24 +1562,24 @@ static int msdc_debug_proc_write(struct file *file, const char *buf, unsigned lo
     }
 #endif
 #if defined(GPIO_SDHC_EINT_PIN)
-#if (GPIO_SDHC_EINT_PIN == GPIO86)
     else if ( cmd == SD_SUSPEND_EINT_DISABLE ) {
-        if ( p1==0 ) {
-            //Set setting
-            if ( p2==0 ) {
-                msdc_disable_eint_while_suspend=0;
+        if (GPIO_SDHC_EINT_PIN == GPIO86) {
+            if ( p1==0 ) {
+                //Set setting
+                if ( p2==0 ) {
+                    msdc_disable_eint_while_suspend=0;
+                } else {
+                    msdc_disable_eint_while_suspend=1;
+                }
+            }
+             //Get setting
+            if ( msdc_disable_eint_while_suspend==0 ) {
+                printk("SD EINT will be enabled during suspend\n");
             } else {
-                msdc_disable_eint_while_suspend=1;
+                printk("SD EINT will be disabled during suspend\n");
             }
         }
-         //Get setting
-        if ( msdc_disable_eint_while_suspend==0 ) {
-            printk("SD EINT will be enabled during suspend\n");
-        } else {
-            printk("SD EINT will be disabled during suspend\n");
-        }
     }
-#endif
 #endif
 
 #ifdef MTK_MMC_PERFORMANCE_TEST

@@ -6,7 +6,7 @@
   =============================================================================*/
 #define FLAG_SUPPORT_PROPERTY
 //#define FLAG_SUPPORT_MODEM_SCALE
-//#define FLAG_SUPPORT_SMI_SETTING
+#define FLAG_SUPPORT_SMI_SETTING
 
 
 
@@ -16,10 +16,30 @@
   =============================================================================*/
 #include    <stdio.h>   //printf()
 #include    <unistd.h>  //gettid()
+
+#ifndef ANDROID_DEFAULT_CODE
+#include <cutils/xlog.h>
+#ifdef ALOGE
+#undef ALOGE
+#endif
+#ifdef ALOGW
+#undef ALOGW
+#endif ALOGI
+#undef ALOGI
+#ifdef ALOGD
+#undef ALOGD
+#endif
+#ifdef ALOGV
+#undef ALOGV
+#endif
+#define ALOGE XLOGE
+#define ALOGW XLOGW
+#define ALOGI XLOGI
+#define ALOGD XLOGD
+#define ALOGV XLOGV
+#else
 #include    <utils/Log.h>
-
-
-
+#endif
 
 /*=============================================================================
     MACRO

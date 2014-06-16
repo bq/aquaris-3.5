@@ -248,6 +248,13 @@ ifeq (yes, $(strip $(MTK_GEMINI_3G_SWITCH)))
   ifneq (yes, $(strip $(GEMINI)))
     $(call dep-err-ona-or-offb, GEMINI, MTK_GEMINI_3G_SWITCH)
   endif
+  ifeq (0, $(strip $(MTK_GEMINI_SMART_3G_SWITCH)))
+    $(call dep-err-seta-or-offb, MTK_GEMINI_SMART_3G_SWITCH,>=1,MTK_GEMINI_3G_SWITCH)
+  endif
+else
+  ifneq (0, $(strip $(MTK_GEMINI_SMART_3G_SWITCH)))
+    $(call dep-err-seta-or-onb, MTK_GEMINI_SMART_3G_SWITCH,0,MTK_GEMINI_3G_SWITCH)
+  endif
 endif
 
 ifeq (yes, $(strip $(MTK_GEMINI_ENHANCEMENT)))
@@ -938,6 +945,15 @@ ifeq ($(strip $(MTK_HDMI_SUPPORT)),yes)
     $(call dep-err-common, CUSTOM_KERNEL_HDMI should not be NULL when MTK_HDMI_SUPPORT=yes)
   endif
 endif
+
+ifeq (MT6572,$(strip $(MTK_PLATFORM)))
+  ifeq ($(strip $(MTK_HDMI_SUPPORT)),yes)
+    $(call dep-err-common, Please turn off MTK_HDMI_SUPPORT when MTK_PLATFORM=MT6572)
+  endif
+  ifneq ($(strip $(CUSTOM_KERNEL_HDMI)),)
+    $(call dep-err-common, Please do not set CUSTOM_KERNEL_HDMI when MTK_PLATFORM=MT6572)
+  endif
+endif
 ############################################################
 ifneq ($(strip $(OPTR_SPEC_SEG_DEF)), NONE)
   ifneq ($(strip $(MTK_NETWORK_TYPE_ALWAYS_ON)), no)
@@ -1024,4 +1040,13 @@ ifeq ($(strip $(MTK_GAMELOFT_GLL_ULC_CN_APP)), yes)
     $(call dep-err-offa-or-offb, MTK_GAMELOFT_GLL_ULC_CN_APP, MTK_GAMELOFT_GLL_ULC_WW_APP)
   endif
 endif
+###########################################################
+ifeq (yes, $(strip $(MTK_SIM_HOT_SWAP_COMMON_SLOT)))
+  ifneq (yes, $(strip $(MTK_SIM_HOT_SWAP)))
+    $(call dep-err-ona-or-offb,MTK_SIM_HOT_SWAP,MTK_SIM_HOT_SWAP_COMMON_SLOT)
+  endif
+endif
+
+
+
 

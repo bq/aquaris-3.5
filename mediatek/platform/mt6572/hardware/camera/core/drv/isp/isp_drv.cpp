@@ -953,7 +953,12 @@ MINT32 IspDrv::setImgoSize(
 
     // start set register
     ISP_WRITE_BITS(pisp, CAM_CTL_MODULE_EN, DB_LOCK, 1);
-    //
+
+    // set CAM_WDMA ultra for drop frame issue
+    LOG_DBG("before set: CAM_IMGO_CON=0x%08x", ISP_READ_REG(pisp, CAM_IMGO_CON));
+    ISP_WRITE_REG(pisp, CAM_IMGO_CON, 0x08100850);
+    LOG_DBG("after set: CAM_IMGO_CON=0x%08x", ISP_READ_REG(pisp, CAM_IMGO_CON));
+
     ISP_WRITE_REG(pisp, CAM_IMGO_XSIZE, (imgoPixel<<1)-1);    
     ISP_WRITE_REG(pisp, CAM_IMGO_YSIZE, imgoLine-1);    
     ISP_WRITE_REG(pisp, CAM_IMGO_STRIDE, (imgoPixel<<1));        

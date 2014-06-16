@@ -2476,6 +2476,8 @@ fgIsUnderEarlierSuspend = false;
     // <3> acquire the prGlueInfo
     prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
     ASSERT(prGlueInfo);
+
+#if 0
     EVENT_AIS_BSS_INFO_T rParam;
     UINT_32 u4BufLen = 0;
     kalMemZero(&rParam, sizeof(EVENT_AIS_BSS_INFO_T));
@@ -2494,6 +2496,7 @@ fgIsUnderEarlierSuspend = false;
             }else{
                 DBGLOG(INIT, INFO, ("Status[%d], Mode[%d], Active[%d]\\n", rParam.eConnectionState, rParam.eCurrentOPMode, rParam.fgIsNetActive));
             }
+#endif
 
     // <2> get the IPv4 address
     if(!(prDev->ip_ptr)||\
@@ -2853,8 +2856,12 @@ bailout:
     while (FALSE);
 
     if (i4Status != WLAN_STATUS_SUCCESS)
+	{
         KAL_WAKE_LOCK_DESTROY(prGlueInfo->prAdapter, &prGlueInfo->rAhbIsrWakeLock);
-
+		if (prWdev != NULL)
+			glBusFreeIrq(prWdev->netdev, *((P_GLUE_INFO_T *) netdev_priv(prWdev->netdev)));
+	}
+	
     return i4Status;
 } /* end of wlanProbe() */
 
@@ -2908,7 +2915,13 @@ wlanRemove(
 #if CFG_ENABLE_WIFI_DIRECT
     prGlueInfo->prAdapter->fgIsWlanLaunched = FALSE;
     if(prGlueInfo->prAdapter->fgIsP2PRegistered) {
+		extern void
+			p2pEalySuspendReg (
+				P_GLUE_INFO_T prGlueInfo,
+				BOOLEAN fgIsEnable
+			);
         p2pNetUnregister(prGlueInfo, FALSE);
+		p2pEalySuspendReg(prGlueInfo, FALSE);
         p2pRemove(prGlueInfo);
     }
 
@@ -2947,12 +2960,14 @@ wlanRemove(
     kalMemSet(&(prGlueInfo->prAdapter->rWlanInfo), 0, sizeof(WLAN_INFO_T));
 
     g_u4HaltFlag = 1;
+    flush_delayed_work_sync(&workq);
+
     down(&g_halt_sem);
 #if CFG_6572_SPM_WORKAROUND
     KAL_WAKE_LOCK_DESTROY(prGlueInfo->prAdapter, &prGlueInfo->prAdapter->rApWakeLock);
 #endif
 
-    flush_delayed_work_sync(&workq);
+//    flush_delayed_work_sync(&workq);
 
     //4 <2> Mark HALT, notify main thread to stop, and clean up queued requests
     prGlueInfo->u4Flag |= GLUE_FLAG_HALT;
@@ -2981,6 +2996,10 @@ wlanRemove(
 #ifdef WLAN_INCLUDE_PROC
     procRemoveProcfs(prDev, NIC_DEVICE_ID_LOW);
 #endif /* WLAN_INCLUDE_PROC */
+
+	/* DMA reset check */
+	DBGLOG(INIT, INFO, ("glResetHif\n"));
+	glResetHif(prGlueInfo);
 
     //4 <4> wlanAdapterStop
     prAdapter = prGlueInfo->prAdapter;

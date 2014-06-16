@@ -20,11 +20,12 @@
 #include <linux/string.h>
 #include <linux/hrtimer.h>
 #include <asm/io.h>
-#include <disp_drv_log.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+
+#include "disp_drv_log.h"
 #include "disp_drv_platform.h"
 
 #include "dpi_reg.h"

@@ -25,7 +25,7 @@ UINT32 gStpDbgLvl = STP_LOG_INFO;
 static const UINT8       stp_delimiter[STP_DEL_SIZE] = {0x55, 0x55};
 static INT32             fgEnableNak         = 0; // 0=enable NAK; 1=disable NAK
 static INT32             fgEnableDelimiter   = 0; // 0=disable Delimiter; 1=enable Delimiter
-
+static UINT32 		     g_retry_times = 0;
 /* common interface */
 static IF_TX            sys_if_tx           = NULL;
 /* event/signal */
@@ -372,7 +372,21 @@ VOID stp_do_tx_timeout(VOID)
     //osal_lock_unsleepable_lock(&stp_core_ctx.stp_mutex);
     stp_ctx_lock(&stp_core_ctx);
 
-
+	if((g_retry_times != 0) && (stp_core_ctx.sequence.retry_times == 0))
+	{
+		STP_INFO_FUNC("STP TX timeout has been recoveryed by resend,record_retry_time(%d)\n",g_retry_times);
+		g_retry_times = 0;
+		stp_ctx_unlock(&stp_core_ctx);
+		return;
+	}else if(stp_core_ctx.sequence.retry_times > (MTKSTP_RETRY_LIMIT))
+	{
+		STP_INFO_FUNC("STP retry times(%d) have reached retry limit,stop it\n",stp_core_ctx.sequence.retry_times);
+		stp_ctx_unlock(&stp_core_ctx);
+		return;
+	}else
+	{
+		STP_DBG_FUNC("current TX timeout package has not received ACK yet,retry_times(%d)\n",g_retry_times);
+	}
 	/*polling cpupcr when no ack occurs at first retry*/
 	stp_notify_btm_poll_cpupcr(STP_BTM_CORE(stp_core_ctx),STP_POLL_CPUPCR_NUM,STP_POLL_CPUPCR_DELAY);
 
@@ -417,13 +431,17 @@ VOID stp_do_tx_timeout(VOID)
     {
         stp_core_ctx.sequence.retry_times++;
         STP_ERR_FUNC("mtkstp_tx_timeout_handler, retry = %d\n", stp_core_ctx.sequence.retry_times);
-
+		g_retry_times = stp_core_ctx.sequence.retry_times;
+		
         /*If retry too much, try to recover STP by return back to initializatin state*/
         /*And not to retry again*/
         if (stp_core_ctx.sequence.retry_times > MTKSTP_RETRY_LIMIT)
         {
+        	g_retry_times = 0;
             osal_timer_stop(&stp_core_ctx.tx_timer);
-            STP_ERR_FUNC("mtkstp_tx_timeout_handler: wmt_stop_timer\n");
+			stp_ctx_unlock(&stp_core_ctx);
+
+			STP_ERR_FUNC("mtkstp_tx_timeout_handler: wmt_stop_timer\n");
 
             STP_ERR_FUNC("TX retry limit = %d\n", MTKSTP_RETRY_LIMIT);
             osal_assert(0);
@@ -461,7 +479,8 @@ VOID stp_do_tx_timeout(VOID)
             		STP_INFO_FUNC("do trigger assert & chip reset in wmt\n");
             	}
             }
-        }
+			return;
+		}
     }
 
     //osal_unlock_unsleepable_lock(&stp_core_ctx.stp_mutex);
@@ -3485,6 +3504,7 @@ VOID mtk_wcn_stp_ctx_restore()
     }else{
         STP_INFO_FUNC("No to launch whole chip reset! for debugging purpose\n");
     }
+	g_retry_times = 0;
 	STP_INFO_FUNC("exit --\n");
 	return;
 }

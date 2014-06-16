@@ -7,7 +7,7 @@
 #include <linux/debugfs.h>
 #include <linux/wait.h>
 
-#include <disp_drv_platform.h>
+#include "disp_drv_platform.h"
 #include "disp_drv_log.h"
 
 #include "lcd_drv.h"
@@ -501,7 +501,7 @@ static void process_dbg_opt(const char *opt)
     {
 	mtkfb_clear_lcm();
     }
-    else if (0 == strncmp(opt, "suspend", 4))
+    else if (0 == strncmp(opt, "suspend", 7))
     {
         DISP_PanelEnable(FALSE);
         DISP_PowerEnable(FALSE);
@@ -509,7 +509,7 @@ static void process_dbg_opt(const char *opt)
         disp_path_clock_off("reg_backup");
 #endif
     }
-    else if (0 == strncmp(opt, "resume", 4))
+    else if (0 == strncmp(opt, "resume", 6))
     {
 #if 0
         disp_path_clock_on("reg_restore");

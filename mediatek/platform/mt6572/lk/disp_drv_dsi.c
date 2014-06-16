@@ -271,7 +271,7 @@ void init_dsi(BOOL isDsiPoweredOn)
                                        0));                     //max_return_size
     
     //initialize DSI_PHY
-    DSI_PHY_clk_switch(TRUE);
+    DSI_PHY_clk_switch(TRUE, lcm_params);
     DSI_PHY_TIMCONFIG(lcm_params);
     DSI_CHECK_RET(DSI_PS_Control(lcm_params->dsi.PS, lcm_params->height, lcm_params->width * dsiTmpBufBpp));
 
@@ -459,7 +459,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             #if 0
                 // Switch bus to MIPI TX.
                 DSI_CHECK_RET(DSI_enable_MIPI_txio(TRUE));
-                DSI_PHY_clk_switch(1);
+                DSI_PHY_clk_switch(TRUE, lcm_params);
                 DSI_PHY_clk_setting(lcm_params->dsi.pll_div1, lcm_params->dsi.pll_div2, lcm_params->dsi.LANE_NUM);
                 DSI_CHECK_RET(DSI_PowerOn());
                 DSI_WaitForNotBusy();		
@@ -472,7 +472,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             #else
                 printf("%s,%d\n", __func__, __LINE__);
                 
-                DSI_PHY_clk_switch(1); 
+                DSI_PHY_clk_switch(TRUE, lcm_params); 
                 // TODO:Fixme
                 #if 0
                     if(Need_Wait_ULPS())
@@ -500,9 +500,9 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             DSI_clk_HS_mode(0);
             DSI_lane0_ULP_mode(1);
             DSI_clk_ULP_mode(1);
-            DSI_PHY_clk_switch(0);
+            DSI_PHY_clk_switch(FALSE, lcm_params);
             DSI_CHECK_RET(DSI_PowerOff());
-            //			DSI_PHY_clk_switch(0);
+            //			DSI_PHY_clk_switch(FALSE, lcm_params);
             // FIX ME
             // Switch bus to GPIO, then power level will be decided by GPIO setting.
             DSI_CHECK_RET(DSI_enable_MIPI_txio(FALSE));
@@ -519,7 +519,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             #if 0
                 // Switch bus to MIPI TX.
                 DSI_CHECK_RET(DSI_enable_MIPI_txio(TRUE));
-                DSI_PHY_clk_switch(1);
+                DSI_PHY_clk_switch(TRUE, lcm_params);
                 DSI_PHY_clk_setting(lcm_params->dsi.pll_div1, lcm_params->dsi.pll_div2, lcm_params->dsi.LANE_NUM);
                 DSI_CHECK_RET(DSI_PowerOn());			
                 DSI_clk_ULP_mode(0);			
@@ -530,7 +530,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
                 LCD_CHECK_RET(LCD_PowerOn());
 
             #else
-                DSI_PHY_clk_switch(1); 
+                DSI_PHY_clk_switch(TRUE, lcm_params); 
                 if(Need_Wait_ULPS())
                 Wait_ULPS_Mode();
                 
@@ -559,10 +559,10 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
 
             DSI_lane0_ULP_mode(1);
             DSI_clk_ULP_mode(1);	
-            DSI_PHY_clk_switch(0);
+            DSI_PHY_clk_switch(FALSE, lcm_params);
             DSI_CHECK_RET(DSI_PowerOff());
             
-            //			DSI_PHY_clk_switch(0);
+            //			DSI_PHY_clk_switch(FALSE, lcm_params);
             // FIX ME
             // Switch bus to GPIO, then power level will be decided by GPIO setting.
             DSI_CHECK_RET(DSI_enable_MIPI_txio(FALSE));
@@ -640,15 +640,13 @@ static DISP_STATUS dsi_update_screen(void)
 static UINT32 dsi_get_working_buffer_size(void)
 {
     disp_drv_dsi_init_context();
-
-	if(lcm_params->dsi.mode != CMD_MODE) {
-        
-            return 
-            DISP_GetScreenWidth() *
-            DISP_GetScreenHeight() *
-            dsiTmpBufBpp *
-            lcm_params->dsi.intermediat_buffer_num;
-	}
+    
+    if(lcm_params->dsi.mode != CMD_MODE) {
+        return DISP_GetScreenWidth() *
+                    DISP_GetScreenHeight() *
+                    dsiTmpBufBpp *
+                    lcm_params->dsi.intermediat_buffer_num;
+    }
     
     return 0;
 }
@@ -657,9 +655,9 @@ static UINT32 dsi_get_working_buffer_bpp(void)
 {
     disp_drv_dsi_init_context();
 
-	if(lcm_params->dsi.mode != CMD_MODE) {
-            return dsiTmpBufBpp;
-	}
+    if(lcm_params->dsi.mode != CMD_MODE) {
+        return dsiTmpBufBpp;
+    }
     
     return 0;
 }
@@ -668,50 +666,44 @@ static PANEL_COLOR_FORMAT dsi_get_panel_color_format(void)
 {
     disp_drv_dsi_init_context();
 
-	{
-
-	    switch(lcm_params->dsi.data_format.format)
-	    {
-		    case LCM_DSI_FORMAT_RGB565 : return PANEL_COLOR_FORMAT_RGB565;
-		    case LCM_DSI_FORMAT_RGB666 : return PANEL_COLOR_FORMAT_RGB666;
-		    case LCM_DSI_FORMAT_RGB888 : return PANEL_COLOR_FORMAT_RGB888;
-		    default : ASSERT(0);
-	    }
-		
-	}
+    switch(lcm_params->dsi.data_format.format)
+    {
+        case LCM_DSI_FORMAT_RGB565 : return PANEL_COLOR_FORMAT_RGB565;
+        case LCM_DSI_FORMAT_RGB666 : return PANEL_COLOR_FORMAT_RGB666;
+        case LCM_DSI_FORMAT_RGB888 : return PANEL_COLOR_FORMAT_RGB888;
+        default : ASSERT(0);
+    }
 }
 
 static UINT32 dsi_get_dithering_bpp(void)
 {
-	return PANEL_COLOR_FORMAT_TO_BPP(dsi_get_panel_color_format());
+    return PANEL_COLOR_FORMAT_TO_BPP(dsi_get_panel_color_format());
 }
 
 DISP_STATUS dsi_capture_framebuffer(UINT32 pvbuf, UINT32 bpp)
 {
-	DSI_CHECK_RET(DSI_WaitForNotBusy());
-
-	DDMS_capturing=1;
-
-	if(lcm_params->dsi.mode == CMD_MODE)
-	{
+    DSI_CHECK_RET(DSI_WaitForNotBusy());
+    
+    DDMS_capturing=1;
+    
+    if(lcm_params->dsi.mode == CMD_MODE)
+    {
         LCD_CHECK_RET(LCD_EnableDCtoDsi(FALSE));
-
-	    LCD_CHECK_RET(LCD_Capture_Framebuffer(pvbuf, bpp));
-	}
-	else
-	{
-	    DPI_CHECK_RET(DPI_Capture_Framebuffer(pvbuf, bpp));
-	}
-
-
-	if(lcm_params->dsi.mode == CMD_MODE)
-	{
+        LCD_CHECK_RET(LCD_Capture_Framebuffer(pvbuf, bpp));
+    }
+    else
+    {
+        DPI_CHECK_RET(DPI_Capture_Framebuffer(pvbuf, bpp));
+    }
+    
+    if(lcm_params->dsi.mode == CMD_MODE)
+    {
         LCD_CHECK_RET(LCD_EnableDCtoDsi(TRUE));
-	}
-
-	DDMS_capturing=0;
-
-	return DISP_STATUS_OK;	
+    }
+    
+    DDMS_capturing=0;
+    
+    return DISP_STATUS_OK;	
 }
 
 
@@ -719,26 +711,25 @@ DISP_STATUS dsi_capture_framebuffer(UINT32 pvbuf, UINT32 bpp)
 // protected by sem_early_suspend, sem_update_screen
 BOOL dsi_esd_check(void)
 {
-	BOOL result = FALSE;
-
-	if(lcm_params->dsi.mode == CMD_MODE || !dsi_vdo_streaming)
-		return FALSE;
-	else
-	{
-#ifndef BUILD_LK
-		if(lcm_params->dsi.lcm_int_te_monitor)
-			result = DSI_esd_check();
-
-		if(result)
-			return TRUE;
-
-		if(lcm_params->dsi.lcm_ext_te_monitor)
-			result = LCD_esd_check();
-
-		return result;
-#endif	
-	}
-
+    BOOL result = FALSE;
+    
+    if(lcm_params->dsi.mode == CMD_MODE || !dsi_vdo_streaming)
+        return FALSE;
+    else
+    {
+        #ifndef BUILD_LK
+            if(lcm_params->dsi.lcm_int_te_monitor)
+                result = DSI_esd_check();
+            
+            if(result)
+                return TRUE;
+            
+            if(lcm_params->dsi.lcm_ext_te_monitor)
+                result = LCD_esd_check();
+            
+            return result;
+        #endif	
+    }
 }
 
 
@@ -753,16 +744,13 @@ void dsi_esd_reset(void)
         DSI_clk_ULP_mode(0);            
         DSI_lane0_ULP_mode(0);  
     }
-	else {
-
-		DSI_SetMode(CMD_MODE);
+    else {
+        DSI_SetMode(CMD_MODE);
         DSI_clk_HS_mode(0);
-		// clock/data lane go to Ideal
-		DSI_Reset();
-		DPI_CHECK_RET(DPI_DisableClk());
-
-	}
-	
+        // clock/data lane go to Ideal
+        DSI_Reset();
+        DPI_CHECK_RET(DPI_DisableClk());
+    }
 }
 
 const DISP_DRIVER *DISP_GetDriverDSI()

@@ -13,14 +13,13 @@ extern s32 mt_set_gpio_pull_enable(u32 pin, u32 enable);
 #include <asm/uaccess.h>
 
 #include "disp_drv.h"
-#include <disp_drv_platform.h>
+#include "disp_drv_platform.h"
 #include "disp_drv_log.h"
 #include "lcd_drv.h"
 #include "lcm_drv.h"
 #include "dpi_drv.h"
 #include "dsi_drv.h"
 #include "dsi_reg.h"
-#include "disp_drv_platform.h"
 #include "debug.h"
 
 #include <linux/disp_assert_layer.h>
@@ -615,11 +614,9 @@ BOOL DISP_IsContextInited(void)
         return FALSE;
 }
 
-int g_dispSearchLcm = 1;
 BOOL DISP_SelectDeviceBoot(const char* lcm_name)
 {
     LCM_DRIVER *lcm = NULL;
-	char dispName[256] = {0};
     int i;
     
     printk("%s\n", __func__);
@@ -627,17 +624,8 @@ BOOL DISP_SelectDeviceBoot(const char* lcm_name)
     if(lcm_name == NULL)
     {
         // we can't do anything in boot stage if lcm_name is NULL
-         printk("[DISP_SelectDeviceBoot] lcm_name=null or no lcm");
-        g_dispSearchLcm = 0;
         return false;
     }
-
-	strcpy(dispName,lcm_name);
-	if(!strcmp(dispName,"no_lcm"))
-	{
-		g_dispSearchLcm = 0;
-		strcpy(dispName,lcm_driver_list[lcm_count-1]->name);
-	}
 
     for(i = 0;i < lcm_count;i++)
     {
@@ -662,7 +650,7 @@ BOOL DISP_SelectDeviceBoot(const char* lcm_name)
             break;
         }
         
-        if(!strcmp(dispName,lcm->name))
+        if(!strcmp(lcm_name,lcm->name))
         {
             printk("\t\t[success]\n");
             u4IndexOfLCMList = i;
@@ -786,7 +774,7 @@ DISP_STATUS DISP_Init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
 #endif
 
     disp_drv_init_ctrl_if();
-    disp_path_clock_on("mtkfb");
+    disp_path_clock_on("reg_non_restore");
     //clk_clr_force_on(MT_CG_DISP0_LARB2_SMI);
 
     // For DSI PHY current leakage SW workaround.
@@ -794,8 +782,8 @@ DISP_STATUS DISP_Init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
 #if !defined (MTK_HDMI_SUPPORT)
     #ifndef MT65XX_NEW_DISP
         if((lcm_params->type!=LCM_TYPE_DSI) && (lcm_params->type!=LCM_TYPE_DPI)){
-            DSI_PHY_clk_switch(TRUE);
-            DSI_PHY_clk_switch(FALSE);
+            DSI_PHY_clk_switch(TRUE, lcm_params);
+            DSI_PHY_clk_switch(FALSE, lcm_params);
         }
     #endif
 #endif
@@ -947,36 +935,43 @@ DISP_STATUS DISP_PowerEnable(BOOL enable)
     static BOOL s_enabled = TRUE;
 #endif
 
-    if (enable != s_enabled)
-        s_enabled = enable;
-    else
-        return ret;
-    
+    DISP_DRV_INFO("power is %s\n", enable?"enabled":"disabled");
+
     if (down_interruptible(&sem_update_screen)) {
         printk("ERROR: Can't get sem_update_screen in DISP_PowerEnable()\n");
         return DISP_STATUS_ERROR;
     }
-    
+
     disp_drv_init_context();
-    
+
     is_engine_in_suspend_mode = enable ? FALSE : TRUE;
     
-    if (!is_ipoh_bootup)
+    if (is_ipoh_bootup)
+    {
+        s_enabled = TRUE;
+    }
+
+    if (enable != s_enabled)
+    {
+        s_enabled = enable;
         needStartEngine = true;
-    
-	if((!is_ipoh_bootup) || (is_ipoh_bootup && lcm_params->type==LCM_TYPE_DSI && lcm_params->dsi.mode == CMD_MODE))
-	{
-        ret = (disp_drv->enable_power) ?
-             (disp_drv->enable_power(enable)) :
-             DISP_STATUS_NOT_IMPLEMENTED;
-	}
+    }
+    else
+    {
+        goto END;
+    }
+
+    // start update    
+    ret = (disp_drv->enable_power) ?
+         (disp_drv->enable_power(enable)) :
+         DISP_STATUS_NOT_IMPLEMENTED;
     
     if (enable) {
         DAL_OnDispPowerOn();
     }
-    
+
+END:    
     up(&sem_update_screen);
-    
     
     return ret;
 }
@@ -1055,7 +1050,7 @@ DISP_STATUS DISP_PanelEnable(BOOL enable)
         {		
             DSI_clk_HS_mode(0);
         }
-		
+
         mutex_lock(&LcmCmdMutex);
         lcm_drv->suspend();
         mutex_unlock(&LcmCmdMutex);
@@ -1521,12 +1516,20 @@ DISP_STATUS DISP_WaitForLCDNotBusy(void)
 
 DISP_STATUS _DISP_ConfigUpdateScreen(UINT32 x, UINT32 y, UINT32 width, UINT32 height)
 {
+    if (down_interruptible(&sem_update_screen)) {
+        printk("ERROR: Can't get sem_update_screen in DISP_PowerEnable()\n");
+        return DISP_STATUS_ERROR;
+    }
+    
 #if defined(MTK_LCD_HW_3D_SUPPORT)
     LCD_CHECK_RET(DISP_Set3DPWM( DISP_Is3DEnabled(), DISP_is3DLandscapeMode() ));
 #endif
     // if LCM is powered down, LCD would never recieve the TE signal
     //
-    if (is_lcm_in_suspend_mode || is_engine_in_suspend_mode) return DISP_STATUS_ERROR;
+    if (is_lcm_in_suspend_mode || is_engine_in_suspend_mode)
+    {
+        goto End;
+    }
     if(((LCM_TYPE_DSI == lcm_params->type) && (CMD_MODE == lcm_params->dsi.mode)) || (LCM_TYPE_DBI == lcm_params->type))
     {
         // reset all display modules
@@ -1553,8 +1556,14 @@ DISP_STATUS _DISP_ConfigUpdateScreen(UINT32 x, UINT32 y, UINT32 width, UINT32 he
         mutex_unlock(&LcmCmdMutex);
     }
     disp_drv->update_screen(TRUE);
+    up(&sem_update_screen);
 
     return DISP_STATUS_OK;
+
+End:
+    up(&sem_update_screen);
+
+    return DISP_STATUS_ERROR;
 }
 
 #define DISP_CB_MAXCNT 2
@@ -2686,10 +2695,10 @@ DISP_STATUS DISP_Capture_Framebuffer( unsigned int pvbuf, unsigned int bpp, unsi
         ret = disp_path_wait_mem_out_done();
         MMProfileLogEx(MTKFB_MMP_Events.CaptureFramebuffer, MMProfileFlagPulse, 3, 0);
 
-       // apply for video mode only
-       if ((lcm_params->type == LCM_TYPE_DPI) ||
-           ((lcm_params->type == LCM_TYPE_DSI) && (lcm_params->dsi.mode != CMD_MODE)))
-       {
+        // apply for video mode only
+        if ((lcm_params->type == LCM_TYPE_DPI) ||
+            ((lcm_params->type == LCM_TYPE_DSI) && (lcm_params->dsi.mode != CMD_MODE)))
+        {
             mutex_lock(&MemOutSettingMutex);
             MemOutConfig.enable = 0;
             MemOutConfig.dirty = 1;
@@ -2723,9 +2732,9 @@ DISP_STATUS DISP_Capture_Framebuffer( unsigned int pvbuf, unsigned int bpp, unsi
         m4u_config_port(&portStruct);
     }
     m4u_dealloc_mva(M4U_CLNTMOD_DISP, 
-        pvbuf, 
-        DISP_GetScreenHeight()*DISP_GetScreenWidth()*bpp/8, 
-        mva);
+                                   pvbuf, 
+                                   DISP_GetScreenHeight()*DISP_GetScreenWidth()*bpp/8, 
+                                   mva);
     disp_power_off(DISP_MODULE_WDMA0, &power_on_record);
 #endif
 #endif

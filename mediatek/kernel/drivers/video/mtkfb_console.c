@@ -3,7 +3,7 @@
 #include <linux/semaphore.h>
 #include <linux/slab.h>
 
-#include <disp_drv_platform.h>
+#include "disp_drv_platform.h"
 #include "mtkfb_console.h"
 
 // ---------------------------------------------------------------------------

@@ -219,7 +219,7 @@ void DSI_Set_VM_CMD(LCM_PARAMS *lcm_params);
 void DSI_Config_VDO_Timing(LCM_PARAMS *lcm_params);
 
 void DSI_PHY_clk_setting(LCM_PARAMS *lcm_params);
-void DSI_PHY_clk_switch(bool on);
+void DSI_PHY_clk_switch(bool on, LCM_PARAMS *lcm_params);
 
 void DSI_PHY_TIMCONFIG(LCM_PARAMS *lcm_params);
 

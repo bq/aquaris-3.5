@@ -193,7 +193,7 @@ static void disp_drv_init_ctrl_if(void)
       
       case LCM_CTRL_SERIAL_DBI :
          ASSERT(dbi->port <= 1);
-							 LCD_CHECK_RET(LCD_Init());
+         LCD_CHECK_RET(LCD_Init());
          ctrl_if = LCD_IF_SERIAL_0 + dbi->port;
          
          #if (MTK_LCD_HW_SIF_VERSION == 1)
@@ -225,7 +225,7 @@ static void disp_drv_init_ctrl_if(void)
       
       case LCM_CTRL_PARALLEL_DBI :
          ASSERT(dbi->port <= 2);
-							 LCD_CHECK_RET(LCD_Init());
+         LCD_CHECK_RET(LCD_Init());
          ctrl_if = LCD_IF_PARALLEL_0 + dbi->port;
          
          LCD_ConfigParallelIF(ctrl_if,
@@ -284,7 +284,6 @@ static const LCM_UTIL_FUNCS lcm_utils =
 extern LCM_DRIVER* lcm_driver_list[];
 extern unsigned int lcm_count;
 extern void init_dsi(BOOL isDsiPoweredOn);
-int g_dispSearchLcm = 1;
 const LCM_DRIVER *disp_drv_get_lcm_driver(const char *lcm_name)
 {
    LCM_DRIVER *lcm = NULL;
@@ -355,7 +354,7 @@ const LCM_DRIVER *disp_drv_get_lcm_driver(const char *lcm_name)
          lcm->get_params(lcm_params);
          
          disp_drv_init_ctrl_if();
-        disp_drv_set_driving_current(lcm_params);
+         disp_drv_set_driving_current(lcm_params);
          disp_drv_init_io_pad(lcm_params);
          
          if(lcm_name != NULL)
@@ -379,7 +378,7 @@ const LCM_DRIVER *disp_drv_get_lcm_driver(const char *lcm_name)
             if(LCM_TYPE_DSI == lcm_params->type){
                init_dsi(FALSE);
             }
-
+   
             if(lcm->compare_id != NULL && lcm->compare_id())
             {
                printk("\t\t[success]\n");
@@ -390,30 +389,21 @@ const LCM_DRIVER *disp_drv_get_lcm_driver(const char *lcm_name)
             }
             else
             {
-				
-	        	lcm_drv = lcm;
-                isLCMFound = TRUE;
-                u4IndexOfLCMList = i;
-                if(i >= (lcm_count-1))
-                {
-                	strcpy(lcm_drv->name,"no_lcm");
-					printk("\t\tno lcm\n");
-                	//g_dispSearchLcm = 0;
-                    goto done;
-                }
+               lcm_drv = lcm;
                if(LCM_TYPE_DSI == lcm_params->type)
-                {
+               {
                    DSI_Deinit();
-                  //  disp_drv->enable_power(FALSE);
-                   DSI_PHY_clk_switch(0);
-                }
+
+                   // disable mipi pll
+                   DSI_PHY_clk_switch(FALSE, lcm_params);
+               }
+
                printk("\t\t[fail]\n");
             }
          }
       }
    }
    done:
-    
       return lcm_drv;
 }
 
@@ -655,8 +645,8 @@ DISP_STATUS DISP_Init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
          
          if((lcm_params->type!=LCM_TYPE_DSI) && (lcm_params->type!=LCM_TYPE_DPI)){
             printf("%s, %d\n", __func__, __LINE__);
-            DSI_PHY_clk_switch(TRUE);
-            DSI_PHY_clk_switch(FALSE);
+            DSI_PHY_clk_switch(TRUE, lcm_params);
+            DSI_PHY_clk_switch(FALSE, lcm_params);
          }
       #endif
    #endif
@@ -669,7 +659,7 @@ DISP_STATUS DISP_Init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
       DISP_InitVSYNC((100000000/lcd_fps) + 1);//us
    #endif
    DISP_LOG("%s, %d\n", __func__, __LINE__);
-	framebuffer_addr_va = fbVA;
+   framebuffer_addr_va = fbVA;
    r = (disp_drv->init) ?
          (disp_drv->init(fbVA, fbPA, isLcmInited)) :
          DISP_STATUS_NOT_IMPLEMENTED;
@@ -686,8 +676,8 @@ DISP_STATUS DISP_Init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
       dal_layerPA = fbPA;
       dal_layerVA = fbVA;
    }
-		if(lcm_drv->check_status)
-			lcm_drv->check_status();
+   if(lcm_drv->check_status)
+       lcm_drv->check_status();
    DISP_LOG("%s, %d\n", __func__, __LINE__);
    
    return r;
@@ -706,38 +696,36 @@ DISP_STATUS DISP_Deinit(void)
 
 DISP_STATUS DISP_PowerEnable(BOOL enable)
 {
-	DISP_STATUS ret = DISP_STATUS_OK;
-
-	static BOOL s_enabled = TRUE;
-
-	if (enable != s_enabled)
-		s_enabled = enable;
-	else
-		return ret;
-
+    DISP_STATUS ret = DISP_STATUS_OK;
+    static BOOL s_enabled = TRUE;
+    
+    if (enable != s_enabled)
+        s_enabled = enable;
+    else
+        return ret;
+    
     if (down_interruptible(&sem_update_screen)) 
     {
-		printk("ERROR: Can't get sem_update_screen in DISP_PowerEnable()\n");
-		return DISP_STATUS_ERROR;
-	}
-
-	disp_drv_init_context();
-
-	is_engine_in_suspend_mode = enable ? FALSE : TRUE;
-
-	ret = (disp_drv->enable_power) ?
-		(disp_drv->enable_power(enable)) :
-		DISP_STATUS_NOT_IMPLEMENTED;
-
+        printk("ERROR: Can't get sem_update_screen in DISP_PowerEnable()\n");
+        return DISP_STATUS_ERROR;
+    }
+    
+    disp_drv_init_context();
+    
+    is_engine_in_suspend_mode = enable ? FALSE : TRUE;
+    
+    ret = (disp_drv->enable_power) ?
+            (disp_drv->enable_power(enable)) :
+            DISP_STATUS_NOT_IMPLEMENTED;
+    
     if (enable) 
     {
         DAL_OnDispPowerOn();
     }
-	
-	up(&sem_update_screen);
-
-
-	return ret;
+    
+    up(&sem_update_screen);
+    
+    return ret;
 }
 
 

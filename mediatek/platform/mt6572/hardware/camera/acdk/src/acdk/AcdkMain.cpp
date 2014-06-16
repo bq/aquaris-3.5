@@ -1545,7 +1545,7 @@ startPreviewExit:
 /*******************************************************************************
 *
 ********************************************************************************/
-MINT32 AcdkMain::stopPreview()
+MINT32 AcdkMain::stopPreview(MUINT32 para)
 {
     ACDK_LOGD("+");
 
@@ -1572,7 +1572,10 @@ MINT32 AcdkMain::stopPreview()
     }
 
 #endif
-
+    if (1 == para)
+    {
+        err = m_pAcdkSurfaceViewObj->disableLayer(0);
+    }
     //====== Free Memory ======
 
     if(mPrvIMemInfo[0].virtAddr != 0)
@@ -1746,7 +1749,7 @@ MINT32 AcdkMain::takePicture(
 
     ACDK_LOGD("stop preview");
 
-    err = stopPreview();
+    err = stopPreview(0);
     if (err != ACDK_RETURN_NO_ERROR)
     {
         ACDK_LOGE("stopPreview fail, err(0x%x)",err);
@@ -3039,7 +3042,7 @@ MINT32 AcdkMain::sendcommand(
     else if(a_u4Ioctl == ACDK_CMD_PREVIEW_STOP)
     {
         ACDK_LOGD("ACDK_CMD_PREVIEW_STOP");
-        err = stopPreview();
+        err = stopPreview(1);
 
         if(err != ACDK_RETURN_NO_ERROR)
         {

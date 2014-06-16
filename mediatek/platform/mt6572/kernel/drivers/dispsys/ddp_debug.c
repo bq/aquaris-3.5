@@ -21,7 +21,6 @@
 #include "ddp_path.h"
 
 #include "disp_drv.h"
-#include <ddp_dpfd.h>
 #include <mach/m4u.h>
 // ---------------------------------------------------------------------------
 //  External variable declarations
@@ -163,9 +162,9 @@ static void process_dbg_opt(const char *opt)
             goto Error;
         }
     }
-    else if (0 == strncmp(opt, "ddp_drv_dbg_log:", 8))
+    else if (0 == strncmp(opt, "ddp_drv_dbg_log:", 16))
     {
-        char *p = (char *)opt + 8;
+        char *p = (char *)opt + 16;
         unsigned int enable = (unsigned int) simple_strtoul(p, &p, 10);
         if (enable)
             ddp_drv_dbg_log = 1;
@@ -174,9 +173,9 @@ static void process_dbg_opt(const char *opt)
 
         sprintf(buf, "ddp_drv_dbg_log: %d\n", ddp_drv_dbg_log);
     }
-    else if (0 == strncmp(opt, "ddp_drv_irq_log:", 8))
+    else if (0 == strncmp(opt, "ddp_drv_irq_log:", 16))
     {
-        char *p = (char *)opt + 8;
+        char *p = (char *)opt + 16;
         unsigned int enable = (unsigned int) simple_strtoul(p, &p, 10);
         if (enable)
             ddp_drv_irq_log = 1;

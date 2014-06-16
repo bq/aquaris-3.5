@@ -193,7 +193,7 @@ MINT32 custom_GetYuvFlashlightDuty(void);
 MINT32 custom_GetYuvFlashlightStep(void);
 MINT32 custom_GetYuvFlashlightHighCurrentDuty(void);
 MINT32 custom_GetYuvFlashlightHighCurrentTimeout(void);
-
+MINT32 custom_GetYuvAfLampSupport(void);
 
 /*******************************************************************************
 * Get the LCM Physical Orientation, the LCM physical orientation 

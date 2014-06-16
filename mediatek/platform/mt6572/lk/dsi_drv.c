@@ -1372,10 +1372,13 @@ void DSI_PHY_clk_setting(LCM_PARAMS *lcm_params)
     OUTREGBIT(MIPITX_DSI_PLL_CON3_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON3,RG_DSI0_MPPLL_SDM_SSC_DELTA,0x048B);
     OUTREGBIT(MIPITX_DSI_PLL_CON3_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON3,RG_DSI0_MPPLL_SDM_SSC_DELTA1,0x048B);
 
-    OUTREGBIT(MIPITX_DSI0_CLOCK_LANE_REG,DSI_PHY_REG->MIPITX_DSI0_CLOCK_LANE,RG_DSI0_LNTC_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE0_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE0,RG_DSI0_LNT0_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE1_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE1,RG_DSI0_LNT1_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE2_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE2,RG_DSI0_LNT2_LDOOUT_EN,1);
+    if (lcm_params->type == LCM_TYPE_DSI)
+    {
+        OUTREGBIT(MIPITX_DSI0_CLOCK_LANE_REG,DSI_PHY_REG->MIPITX_DSI0_CLOCK_LANE,RG_DSI0_LNTC_LDOOUT_EN,1);
+        OUTREGBIT(MIPITX_DSI0_DATA_LANE0_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE0,RG_DSI0_LNT0_LDOOUT_EN,1);
+        OUTREGBIT(MIPITX_DSI0_DATA_LANE1_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE1,RG_DSI0_LNT1_LDOOUT_EN,1);
+        OUTREGBIT(MIPITX_DSI0_DATA_LANE2_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE2,RG_DSI0_LNT2_LDOOUT_EN,1);
+    }
 
     OUTREGBIT(MIPITX_DSI_PLL_CON0_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON0,RG_DSI0_MPPLL_PLL_EN,1);
     //	msleep(20);
@@ -1429,10 +1432,13 @@ void DSI_PHY_clk_setting(LCM_PARAMS *lcm_params)
     // 500MHz
     OUTREGBIT(MIPITX_DSI_PLL_CON2_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON2,RG_DSI0_MPPLL_SDM_PCW_H,lcm_params->dsi.fbk_div << 2);
 
-    OUTREGBIT(MIPITX_DSI0_CLOCK_LANE_REG,DSI_PHY_REG->MIPITX_DSI0_CLOCK_LANE,RG_DSI0_LNTC_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE0_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE0,RG_DSI0_LNT0_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE1_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE1,RG_DSI0_LNT1_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE2_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE2,RG_DSI0_LNT2_LDOOUT_EN,1);
+    if (lcm_params->type == LCM_TYPE_DSI)
+    {
+        OUTREGBIT(MIPITX_DSI0_CLOCK_LANE_REG,DSI_PHY_REG->MIPITX_DSI0_CLOCK_LANE,RG_DSI0_LNTC_LDOOUT_EN,1);
+        OUTREGBIT(MIPITX_DSI0_DATA_LANE0_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE0,RG_DSI0_LNT0_LDOOUT_EN,1);
+        OUTREGBIT(MIPITX_DSI0_DATA_LANE1_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE1,RG_DSI0_LNT1_LDOOUT_EN,1);
+        OUTREGBIT(MIPITX_DSI0_DATA_LANE2_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE2,RG_DSI0_LNT2_LDOOUT_EN,1);
+    }
 
     OUTREGBIT(MIPITX_DSI_PLL_CON0_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON0,RG_DSI0_MPPLL_PLL_EN,1);
     //	msleep(20);
@@ -1447,15 +1453,17 @@ void DSI_PHY_clk_setting(LCM_PARAMS *lcm_params)
 }
 
 
-void DSI_PHY_clk_switch(BOOL on)
+void DSI_PHY_clk_switch(BOOL on, LCM_PARAMS *lcm_params)
 {
     if(on){//workaround: do nothing
-        //pad_tie_low_en = 0
-        OUTREGBIT(MIPITX_DSI_TOP_CON_REG,DSI_PHY_REG->MIPITX_DSI_TOP_CON,RG_DSI_PAD_TIE_LOW_EN,0);
-        
-        // switch to mipi tx dsi mode
-        OUTREGBIT(MIPITX_DSI_SW_CTRL_REG,DSI_PHY_REG->MIPITX_DSI_SW_CTRL,SW_CTRL_EN,0);
-
+        if (lcm_params->type == LCM_TYPE_DSI)
+        {
+            //pad_tie_low_en = 0
+            OUTREGBIT(MIPITX_DSI_TOP_CON_REG,DSI_PHY_REG->MIPITX_DSI_TOP_CON,RG_DSI_PAD_TIE_LOW_EN,0);
+            
+            // switch to mipi tx dsi mode
+            OUTREGBIT(MIPITX_DSI_SW_CTRL_REG,DSI_PHY_REG->MIPITX_DSI_SW_CTRL,SW_CTRL_EN,0);
+        }
     }
     else
     {
@@ -1469,20 +1477,29 @@ void DSI_PHY_clk_switch(BOOL on)
         OUTREGBIT(MIPITX_DSI_SW_CTRL_CON0_REG,DSI_PHY_REG->MIPITX_DSI_SW_CTRL_CON0,SW_LNT2_LPTX_PRE_OE,1);
         OUTREGBIT(MIPITX_DSI_SW_CTRL_CON0_REG,DSI_PHY_REG->MIPITX_DSI_SW_CTRL_CON0,SW_LNT2_LPTX_OE,1);
     
-        // switch to mipi tx sw mode
-        OUTREGBIT(MIPITX_DSI_SW_CTRL_REG,DSI_PHY_REG->MIPITX_DSI_SW_CTRL,SW_CTRL_EN,1);
+        if (lcm_params->type == LCM_TYPE_DSI)
+        {
+            // switch to mipi tx sw mode
+            OUTREGBIT(MIPITX_DSI_SW_CTRL_REG,DSI_PHY_REG->MIPITX_DSI_SW_CTRL,SW_CTRL_EN,1);
+        }
 
         // disable mipi clock
         OUTREGBIT(MIPITX_DSI_PLL_CON0_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON0,RG_DSI0_MPPLL_PLL_EN,0);
         mdelay(1);
         
-        OUTREGBIT(MIPITX_DSI_TOP_CON_REG,DSI_PHY_REG->MIPITX_DSI_TOP_CON,RG_DSI_PAD_TIE_LOW_EN,1);
+        if (lcm_params->type == LCM_TYPE_DSI)
+        {
+            OUTREGBIT(MIPITX_DSI_TOP_CON_REG,DSI_PHY_REG->MIPITX_DSI_TOP_CON,RG_DSI_PAD_TIE_LOW_EN,1);
+        }
 
         OUTREGBIT(MIPITX_DSI_TOP_CON_REG,DSI_PHY_REG->MIPITX_DSI_TOP_CON,RG_DSI_LNT_HS_BIAS_EN,0);
-        OUTREGBIT(MIPITX_DSI0_CLOCK_LANE_REG,DSI_PHY_REG->MIPITX_DSI0_CLOCK_LANE,RG_DSI0_LNTC_LDOOUT_EN,0);
-        OUTREGBIT(MIPITX_DSI0_DATA_LANE0_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE0,RG_DSI0_LNT0_LDOOUT_EN,0);
-        OUTREGBIT(MIPITX_DSI0_DATA_LANE1_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE1,RG_DSI0_LNT1_LDOOUT_EN,0);
-        OUTREGBIT(MIPITX_DSI0_DATA_LANE2_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE2,RG_DSI0_LNT2_LDOOUT_EN,0);
+        if (lcm_params->type == LCM_TYPE_DSI)
+        {
+            OUTREGBIT(MIPITX_DSI0_CLOCK_LANE_REG,DSI_PHY_REG->MIPITX_DSI0_CLOCK_LANE,RG_DSI0_LNTC_LDOOUT_EN,0);
+            OUTREGBIT(MIPITX_DSI0_DATA_LANE0_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE0,RG_DSI0_LNT0_LDOOUT_EN,0);
+            OUTREGBIT(MIPITX_DSI0_DATA_LANE1_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE1,RG_DSI0_LNT1_LDOOUT_EN,0);
+            OUTREGBIT(MIPITX_DSI0_DATA_LANE2_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE2,RG_DSI0_LNT2_LDOOUT_EN,0);
+        }
         mdelay(1);
 
         OUTREGBIT(MIPITX_DSI0_CON_REG,DSI_PHY_REG->MIPITX_DSI0_CON,RG_DSI0_CKG_LDOOUT_EN,0);
@@ -2461,9 +2478,9 @@ void DSI_set_cmdq(unsigned int *pdata, unsigned int queue_size, unsigned char fo
     //for (i = 0; i < queue_size; i++)
      //   printf("[DISP] - kernel - DSI_set_cmdq. DSI_CMDQ+%04x : 0x%08x\n", i*4, INREG32(DSI_BASE + 0x180 + i*4));
 
-	if(force_update)
-		DSI_EnableClk();
-	}
+    if(force_update)
+        DSI_EnableClk();
+    }
 }
 
 
@@ -2547,7 +2564,7 @@ DSI_STATUS DSI_TXRX_Control(BOOL cksm_en,
     tmp_reg.DIS_EOT = dis_eotp_en;
     tmp_reg.NULL_EN = null_packet_en;
     tmp_reg.MAX_RTN_SIZE = max_return_size;
-	tmp_reg.HSTX_CKLP_EN = 0;//need customization???
+    tmp_reg.HSTX_CKLP_EN = 0;//need customization???
     OUTREG32(&DSI_REG->DSI_TXRX_CTRL, AS_UINT32(&tmp_reg));
 
     return DSI_STATUS_OK;
@@ -2557,21 +2574,23 @@ DSI_STATUS DSI_TXRX_Control(BOOL cksm_en,
 DSI_STATUS DSI_PS_Control(unsigned int ps_type, unsigned int vact_line, unsigned int ps_wc)
 {
     DSI_PSCTRL_REG tmp_reg;
-	UINT32 tmp_hstx_cklp_wc;
+    UINT32 tmp_hstx_cklp_wc;
     tmp_reg=DSI_REG->DSI_PSCTRL;
     
     ///TODO: parameter checking
     ASSERT(ps_type <= PACKED_PS_18BIT_RGB666);
-	if(ps_type>LOOSELY_PS_18BIT_RGB666)
-    	tmp_reg.DSI_PS_SEL=(5 - ps_type);
-	else
-		tmp_reg.DSI_PS_SEL=ps_type;
+    if(ps_type>LOOSELY_PS_18BIT_RGB666)
+        tmp_reg.DSI_PS_SEL=(5 - ps_type);
+    else
+        tmp_reg.DSI_PS_SEL=ps_type;
+
     tmp_reg.DSI_PS_WC=ps_wc;
     tmp_hstx_cklp_wc = ps_wc;
 
-	OUTREG32(&DSI_REG->DSI_VACT_NL, AS_UINT32(&vact_line));
+    OUTREG32(&DSI_REG->DSI_VACT_NL, AS_UINT32(&vact_line));
     OUTREG32(&DSI_REG->DSI_PSCTRL, AS_UINT32(&tmp_reg));   
-	OUTREG32(&DSI_REG->DSI_HSTX_CKL_WC, tmp_hstx_cklp_wc);
+    OUTREG32(&DSI_REG->DSI_HSTX_CKL_WC, tmp_hstx_cklp_wc);
+
     return DSI_STATUS_OK;
 }
 
@@ -2787,10 +2806,10 @@ UINT32 DSI_dcs_read_lcm_reg_v2(UINT8 cmd, UINT8 *buffer, UINT8 buffer_size)
     UINT32 recv_data_cnt;
     unsigned int read_timeout_ms;
     unsigned char packet_type;
-	DSI_RX_DATA_REG read_data0;
-	DSI_RX_DATA_REG read_data1;
-	DSI_RX_DATA_REG read_data2;
-	DSI_RX_DATA_REG read_data3;
+    DSI_RX_DATA_REG read_data0;
+    DSI_RX_DATA_REG read_data1;
+    DSI_RX_DATA_REG read_data2;
+    DSI_RX_DATA_REG read_data3;
 #if 1
     DSI_T0_INS t0;  
 
@@ -2798,8 +2817,9 @@ UINT32 DSI_dcs_read_lcm_reg_v2(UINT8 cmd, UINT8 *buffer, UINT8 buffer_size)
     static const long WAIT_TIMEOUT = 2 * HZ;    // 2 sec
     long ret;
 #endif
-	if (DSI_REG->DSI_MODE_CTRL.MODE)
-		return 0;
+
+    if (DSI_REG->DSI_MODE_CTRL.MODE)
+        return 0;
 
     if (buffer == NULL || buffer_size == 0)
         return 0;
@@ -2807,10 +2827,11 @@ UINT32 DSI_dcs_read_lcm_reg_v2(UINT8 cmd, UINT8 *buffer, UINT8 buffer_size)
 do
     {
        if(max_try_count == 0)
-	  return 0;
+           return 0;
        max_try_count--;
+
        recv_data_cnt = 0;
-       read_timeout_ms = 200;
+       read_timeout_ms = 200;//zhaoshaopeng from mtk 20130529 for reading lcm_id timeout
         
        DSI_WaitForEngineNotBusy();
 
@@ -2833,11 +2854,9 @@ do
        //DSI_REG->DSI_INTEN.CMD_DONE=  1;
        OUTREGBIT(DSI_RACK_REG,DSI_REG->DSI_RACK,DSI_RACK,1);
        OUTREGBIT(DSI_INT_STATUS_REG,DSI_REG->DSI_INTSTA,RD_RDY,1);
-	   OUTREGBIT(DSI_INT_STATUS_REG,DSI_REG->DSI_INTSTA,CMD_DONE,1);
-	   OUTREGBIT(DSI_INT_ENABLE_REG,DSI_REG->DSI_INTEN,RD_RDY,1);
-	   OUTREGBIT(DSI_INT_ENABLE_REG,DSI_REG->DSI_INTEN,CMD_DONE,1);
-
-
+       OUTREGBIT(DSI_INT_STATUS_REG,DSI_REG->DSI_INTSTA,CMD_DONE,1);
+       OUTREGBIT(DSI_INT_ENABLE_REG,DSI_REG->DSI_INTEN,RD_RDY,1);
+       OUTREGBIT(DSI_INT_ENABLE_REG,DSI_REG->DSI_INTEN,CMD_DONE,1);
 
        OUTREG32(&DSI_REG->DSI_START, 0);
        OUTREG32(&DSI_REG->DSI_START, 1);
@@ -2855,15 +2874,15 @@ do
         {
             xlog_printk(ANDROID_LOG_WARN, "DSI", " Wait for DSI engine read ready timeout!!!\n");
 
-				DSI_DumpRegisters();
-				
-				///do necessary reset here
-				//DSI_REG->DSI_RACK.DSI_RACK = 1;
-				OUTREGBIT(DSI_RACK_REG,DSI_REG->DSI_RACK,DSI_RACK,1);
-				DSI_Reset();
+            DSI_DumpRegisters();
+            
+            ///do necessary reset here
+            //DSI_REG->DSI_RACK.DSI_RACK = 1;
+            OUTREGBIT(DSI_RACK_REG,DSI_REG->DSI_RACK,DSI_RACK,1);
+            DSI_Reset();
 
-                return 0;
-            }
+            return 0;
+        }
 #else
     #ifdef DDI_DRV_DEBUG_LOG_ENABLE
         DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " Start polling DSI read ready!!!\n");
@@ -2904,46 +2923,45 @@ do
        //DSI_REG->DSI_INTEN.RD_RDY =  0;
        OUTREGBIT(DSI_INT_ENABLE_REG,DSI_REG->DSI_INTEN,RD_RDY,1);
 
-	   OUTREG32(&read_data0, AS_UINT32(&DSI_REG->DSI_RX_DATA0));
-	   OUTREG32(&read_data1, AS_UINT32(&DSI_REG->DSI_RX_DATA1));
-	   OUTREG32(&read_data2, AS_UINT32(&DSI_REG->DSI_RX_DATA2));
-	   OUTREG32(&read_data3, AS_UINT32(&DSI_REG->DSI_RX_DATA3));
-    #ifdef DDI_DRV_DEBUG_LOG_ENABLE
-    {
-       unsigned int i;
-//       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_STA : 0x%x \n", DSI_REG->DSI_RX_STA);
-       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_SIZE : 0x%x \n", DSI_REG->DSI_CMDQ_SIZE.CMDQ_SIZE);
-       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA0 : 0x%x \n", DSI_CMDQ_REG->data[0].byte0);
-       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA1 : 0x%x \n", DSI_CMDQ_REG->data[0].byte1);
-       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA2 : 0x%x \n", DSI_CMDQ_REG->data[0].byte2);
-       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA3 : 0x%x \n", DSI_CMDQ_REG->data[0].byte3);
-#if 1	
-	   DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA0 : 0x%x \n", DSI_REG->DSI_RX_DATA0);
-	   DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA1 : 0x%x \n", DSI_REG->DSI_RX_DATA1);
-	   DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA2 : 0x%x \n", DSI_REG->DSI_RX_DATA2);
-       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA3 : 0x%x \n", DSI_REG->DSI_RX_DATA3);
+       OUTREG32(&read_data0, AS_UINT32(&DSI_REG->DSI_RX_DATA0));
+       OUTREG32(&read_data1, AS_UINT32(&DSI_REG->DSI_RX_DATA1));
+       OUTREG32(&read_data2, AS_UINT32(&DSI_REG->DSI_RX_DATA2));
+       OUTREG32(&read_data3, AS_UINT32(&DSI_REG->DSI_RX_DATA3));
 
-       printf("read_data0, %x,%x,%x,%x\n", read_data0.byte0, read_data0.byte1, read_data0.byte2, read_data0.byte3);
-	   printf("read_data1, %x,%x,%x,%x\n", read_data1.byte0, read_data1.byte1, read_data1.byte2, read_data1.byte3);
-	   printf("read_data2, %x,%x,%x,%x\n", read_data2.byte0, read_data2.byte1, read_data2.byte2, read_data2.byte3);
-	   printf("read_data3, %x,%x,%x,%x\n", read_data3.byte0, read_data3.byte1, read_data3.byte2, read_data3.byte3);
+       #ifdef DDI_DRV_DEBUG_LOG_ENABLE
+       {
+          unsigned int i;
+   //       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_STA : 0x%x \n", DSI_REG->DSI_RX_STA);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_SIZE : 0x%x \n", DSI_REG->DSI_CMDQ_SIZE.CMDQ_SIZE);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA0 : 0x%x \n", DSI_CMDQ_REG->data[0].byte0);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA1 : 0x%x \n", DSI_CMDQ_REG->data[0].byte1);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA2 : 0x%x \n", DSI_CMDQ_REG->data[0].byte2);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_CMDQ_DATA3 : 0x%x \n", DSI_CMDQ_REG->data[0].byte3);
+#if 1	
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA0 : 0x%x \n", DSI_REG->DSI_RX_DATA0);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA1 : 0x%x \n", DSI_REG->DSI_RX_DATA1);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA2 : 0x%x \n", DSI_REG->DSI_RX_DATA2);
+          DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_DATA3 : 0x%x \n", DSI_REG->DSI_RX_DATA3);
+   
+          printf("read_data0, %x,%x,%x,%x\n", read_data0.byte0, read_data0.byte1, read_data0.byte2, read_data0.byte3);
+          printf("read_data1, %x,%x,%x,%x\n", read_data1.byte0, read_data1.byte1, read_data1.byte2, read_data1.byte3);
+          printf("read_data2, %x,%x,%x,%x\n", read_data2.byte0, read_data2.byte1, read_data2.byte2, read_data2.byte3);
+          printf("read_data3, %x,%x,%x,%x\n", read_data3.byte0, read_data3.byte1, read_data3.byte2, read_data3.byte3);
 #endif
-    }
-    #endif
+       }
+       #endif
 
 #if 1
-	packet_type = read_data0.byte0;
+        packet_type = read_data0.byte0;
            
     #ifdef DDI_DRV_DEBUG_LOG_ENABLE
-       DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI read packet_type is 0x%x \n",packet_type);
+        DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI read packet_type is 0x%x \n",packet_type);
     #endif
 
-
-
-	if(packet_type == 0x1A || packet_type == 0x1C)
+    if(packet_type == 0x1A || packet_type == 0x1C)
     {
-    	recv_data_cnt = read_data0.byte1 + read_data0.byte2 * 16;
-		if(recv_data_cnt > 10)
+        recv_data_cnt = read_data0.byte1 + read_data0.byte2 * 16;
+        if(recv_data_cnt > 10)
         {
     #ifdef DDI_DRV_DEBUG_LOG_ENABLE
             DISP_LOG_PRINT(ANDROID_LOG_WARN, "DSI", " DSI read long packet data  exceeds 4 bytes \n");
@@ -3038,7 +3056,7 @@ DSI_STATUS DSI_enable_MIPI_txio(BOOL en)
         *(volatile unsigned int *) (INFRACFG_BASE+0x890) &= ~0x00000100;   // disable MIPI TX IO   
     }
 #endif
-	return DSI_STATUS_OK;
+    return DSI_STATUS_OK;
 }
 
 

@@ -90,6 +90,7 @@ typedef enum _MTK_WCN_HIF_GDMA_CONNECT {
 #define AP_P_DMA_G_DMA_2_DST_ADDR   (0x0020)
 #define AP_P_DMA_G_DMA_2_INT_EN     (0x0004)
 #define AP_P_DMA_G_DMA_2_EN         (0x0008)
+#define AP_P_DMA_G_DMA_2_RST        (0x000C)
 #define AP_P_DMA_G_DMA_2_STOP       (0x0010)
 
 #define AP_DMA_HIF_0_LENGTH         0x0038

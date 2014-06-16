@@ -114,7 +114,7 @@ DPI_STATUS DPI_Get_Current_CLK(unsigned int *clk);
 DPI_STATUS DPI_Change_CLK(unsigned int clk);
 DPI_STATUS DPI_Reset_CLK(void);
 
-void DPI_mipi_switch(bool on);
+void DPI_mipi_switch(bool on, LCM_PARAMS *lcm_params);
 void DPI_DisableIrq(void);
 void DPI_EnableIrq(void);
 DPI_STATUS DPI_FreeIRQ(void);

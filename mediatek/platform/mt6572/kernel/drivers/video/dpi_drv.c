@@ -23,11 +23,12 @@
 #include <linux/string.h>
 #include <linux/hrtimer.h>
 #include <asm/io.h>
-#include <disp_drv_log.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+
+#include "disp_drv_log.h"
 #include "disp_drv_platform.h"
 
 #include "ddp_reg.h"
@@ -340,9 +341,9 @@ DPI_STATUS DPI_Deinit(void)
 EXPORT_SYMBOL(DPI_Deinit);
 
 
-void DPI_mipi_switch(bool on)
+void DPI_mipi_switch(bool on, LCM_PARAMS *lcm_params)
 {
-   DSI_PHY_clk_switch(on); 
+   DSI_PHY_clk_switch(on, lcm_params); 
 }
 
 #ifndef BULID_UBOOT
@@ -428,11 +429,6 @@ DPI_STATUS DPI_Init_PLL(LCM_PARAMS *lcm_params)
 
     // 500MHz
     OUTREGBIT(MIPITX_DSI_PLL_CON2_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON2,RG_DSI0_MPPLL_SDM_PCW_H,lcm_params->dpi.mipi_pll_clk_fbk_div << 2);
-
-    OUTREGBIT(MIPITX_DSI0_CLOCK_LANE_REG,DSI_PHY_REG->MIPITX_DSI0_CLOCK_LANE,RG_DSI0_LNTC_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE0_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE0,RG_DSI0_LNT0_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE1_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE1,RG_DSI0_LNT1_LDOOUT_EN,1);
-    OUTREGBIT(MIPITX_DSI0_DATA_LANE2_REG,DSI_PHY_REG->MIPITX_DSI0_DATA_LANE2,RG_DSI0_LNT2_LDOOUT_EN,1);
 
     OUTREGBIT(MIPITX_DSI_PLL_CON0_REG,DSI_PHY_REG->MIPITX_DSI_PLL_CON0,RG_DSI0_MPPLL_PLL_EN,1);
     //	msleep(20);
@@ -829,6 +825,11 @@ DPI_STATUS DPI_DumpRegisters(void)
     for (i = 0; i < sizeof(DPI_REGS); i += 4)
     {
         DISP_LOG_PRINT(ANDROID_LOG_WARN, "DPI", "DPI+%04x : 0x%08x\n", i, INREG32(DISP_DPI_BASE + i));
+    }
+
+    for (i = 0; i < sizeof(DSI_PHY_REGS); i += 4)
+    {
+        DISP_LOG_PRINT(ANDROID_LOG_INFO, "DPI", "DPI_PHY+%04x(%p) : 0x%08x\n", i, (UINT32*)(MIPI_CONFIG_BASE+i), INREG32((MIPI_CONFIG_BASE+i)));
     }
 
     return DPI_STATUS_OK;

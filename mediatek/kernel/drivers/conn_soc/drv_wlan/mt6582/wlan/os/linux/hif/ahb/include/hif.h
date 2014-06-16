@@ -9,7 +9,6 @@
 */
 
 
-
 /*
 ** $Log: hif.h $
  *
@@ -137,6 +136,10 @@ typedef struct _GL_HIF_DMA_OPS_T { /* DMA Operators */
         IN VOID                     *HifInfo
         );
 
+	VOID (*DmaReset)(
+		IN VOID                     *HifInfo
+		);
+
 } GL_HIF_DMA_OPS_T;
 
 typedef struct _GL_HIF_INFO_T {
@@ -258,6 +261,10 @@ HifRegDump(
     P_ADAPTER_T prAdapter
     );
 
+VOID
+glResetHif (
+	GLUE_INFO_T *GlueInfo
+	);
 
 WLAN_STATUS
 glRegisterBus(

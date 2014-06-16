@@ -204,6 +204,13 @@ public:
     virtual MINT32 resetLayer(MUINT32 const layerNo) = 0; 
 
     /**
+       *@brief Disable display layer to avoid free m4u memory, the dispsys still read the buffer.
+       *@return
+       *-0 indicates success, otherwise indicates fail
+       */
+    virtual MINT32 disableLayer(MUINT32 const layerNo) = 0; 
+
+    /**
        *@brief Set to active layer       
        */
     virtual MVOID resetActiveFrameBuffer(MUINT32 a_u4No) = 0;

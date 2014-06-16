@@ -194,6 +194,17 @@ MINT32 custom_GetYuvFlashlightStep(void)
     return (int)FLASHLIGHT_YUV_STEP;
 }
 
+/*******************************************************************************
+* Author : CD
+* Functionality : custom yuv flashlight AF Lamp support
+*******************************************************************************/
+#define FLASHLIGHT_YUV_AF_LAMP 0
+MINT32 custom_GetYuvAfLampSupport(void)
+{
+    // 0: indicates no AF lamp when touch AF
+    // 1: indicates AF lamp support for touch AF
+    return (int)FLASHLIGHT_YUV_AF_LAMP;
+}
 
 /*******************************************************************************
 * 

@@ -3,15 +3,15 @@
 # ALPS(Android4.1 based) build environment profile setting
 # ##########################################################
 # Overwrite JAVA_HOME environment variable setting if already exists
-JAVA_HOME=/mtkoss/jdk/jdk1.6.0_23
+JAVA_HOME=/opt/jdk1.6.0_31
 export JAVA_HOME
 
 # Overwrite ANDROID_JAVA_HOME environment variable setting if already exists
-ANDROID_JAVA_HOME=/mtkoss/jdk/jdk1.6.0_23
+ANDROID_JAVA_HOME=/opt/jdk1.6.0_31
 export ANDROID_JAVA_HOME
 
 # Overwrite PATH environment setting for JDK & arm-eabi if already exists
-PATH=/mtkoss/jdk/jdk1.6.0_23/bin:$PWD/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.6/bin:$PATH
+PATH=/opt/jdk1.6.0_31/bin:$PWD/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.6/bin:$PATH
 export PATH
 
 # Add MediaTek developed Python libraries path into PYTHONPATH

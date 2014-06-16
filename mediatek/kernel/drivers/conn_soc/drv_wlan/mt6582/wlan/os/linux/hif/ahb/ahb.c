@@ -10,7 +10,6 @@
 ******************************************************************************/
 
 
-
 /*
 ** $Log: ahb.c $
  *
@@ -314,6 +313,7 @@ HifAhbLoopbkAuto(
 *                            P U B L I C   D A T A
 ********************************************************************************
 */
+extern BOOLEAN fgIsResetting;
 
 
 /*******************************************************************************
@@ -524,6 +524,20 @@ static int wmt_set_jtag_for_gps(void)
 }
 
 
+VOID
+glResetHif (
+	GLUE_INFO_T *GlueInfo
+	)
+{
+	GL_HIF_INFO_T *HifInfo;
+
+	ASSERT(GlueInfo);
+	HifInfo = &GlueInfo->rHifInfo;
+	if (HifInfo->DmaOps)
+		HifInfo->DmaOps->DmaReset(HifInfo);
+}
+
+
 /*----------------------------------------------------------------------------*/
 /*!
 * \brief This function will register sdio bus to the os
@@ -648,6 +662,8 @@ glSetHifInfo (
 
 
     /* Init DMA */
+	WlanDmaFatalErr = 0; /* reset error flag */
+
 #if (CONF_MTK_AHB_DMA == 1)
     spin_lock_init(&HifInfo->DdmaLock);
 
@@ -964,7 +980,7 @@ kalDevPortRead (
 #endif
 
     /* sanity check */
-    if (WlanDmaFatalErr == 1)
+    if ((WlanDmaFatalErr == 1) || (fgIsResetting == TRUE))
         return TRUE;
 
     /* Init */
@@ -1192,7 +1208,7 @@ kalDevPortWrite (
 //    printk("++kalDevPortWrite++ buf:0x%p, port:0x%x, length:%d\n", Buf, Port, Size); //samp
 
     /* sanity check */
-    if (WlanDmaFatalErr == 1)
+    if ((WlanDmaFatalErr == 1) || (fgIsResetting == TRUE))
         return TRUE;
 
     /* Init */

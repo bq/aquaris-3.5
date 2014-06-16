@@ -10,7 +10,6 @@
 ******************************************************************************/
 
 
-
 /*
 ** $Log: ahb_gdma.c $
  *
@@ -157,6 +156,11 @@ static VOID
 HifGdmaRegDump(
     IN GL_HIF_INFO_T            *HifInfo
     );
+	
+static VOID
+HifGdmaReset(
+    IN void                     *HifInfoSrc
+    );
 
 
 /*******************************************************************************
@@ -177,7 +181,8 @@ GL_HIF_DMA_OPS_T HifGdmaOps = {
     .DmaPollIntr = HifGdmaPollIntr,
     .DmaAckIntr = HifGdmaAckIntr,
     .DmaClockCtrl = HifGdmaClockCtrl,
-    .DmaRegDump = HifGdmaRegDump
+    .DmaRegDump = HifGdmaRegDump,
+	.DmaReset = HifGdmaReset
 };
 
 
@@ -489,6 +494,48 @@ HifGdmaRegDump(
     }
 
     printk("\nGDMA> clock status = 0x%x\n\n", *(volatile unsigned int *)0xF0000024);
+}
+
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief Reset DMA.
+*
+* \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
+*
+* \retval NONE
+*/
+/*----------------------------------------------------------------------------*/
+static VOID
+HifGdmaReset(
+    IN void                     *HifInfoSrc
+    )
+{
+    GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *)HifInfoSrc;
+    UINT32 LoopCnt;
+
+
+    /* do warm reset: DMA will wait for current traction finished */
+    printk("\nDMA> do warm reset...\n");
+
+    /* normally, we need to sure that bit0 of AP_P_DMA_G_DMA_2_EN is 1 here */
+
+    HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_RST, 0x01);
+
+    for(LoopCnt=0; LoopCnt<10000; LoopCnt++)
+    {
+        if (!HifGdmaPollStart(HifInfo))
+            break; /* reset ok */
+    }
+
+    if (HifGdmaPollStart(HifInfo))
+    {
+        /* do hard reset because warm reset fails */
+        printk("\nDMA> do hard reset...\n");
+        HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_RST, 0x02);
+        msleep(1);
+        HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_RST, 0x00);
+    }
 }
 
 #endif /* CONF_MTK_AHB_DMA */

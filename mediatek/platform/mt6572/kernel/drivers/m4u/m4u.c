@@ -1120,7 +1120,7 @@ static irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
         faultMva = M4U_ReadReg32(m4u_base, REG_MMU_FAULT_VA);
 
 
-        M4UMSG("m4u isr: intrSrc=0x%x ************** \n", IntrSrc);
+        M4UMSG("m4u isr: intrSrc=0x%x ==>\n", IntrSrc);
 
 #ifdef M4U_INT_INVALIDATION_DONE 		
         if(IntrSrc&F_INT_INVALIDATION_DONE)
@@ -1131,12 +1131,22 @@ static irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
         {
             if(F_INT_PFH_DMA_FIFO_OVERFLOW != IntrSrc)        
             {
-                m4u_dump_main_tlb_des();
-                m4u_dump_pfh_tlb_des();
+               if((IntrSrc&F_INT_TRANSLATION_FAULT) || IntrSrc&F_INT_INVALID_PHYSICAL_ADDRESS_FAULT)
+               {
+				   
+                   regval = M4U_ReadReg32(m4u_base, REG_MMU_INT_ID);
+                   portID = F_INT_ID_TF_PORT_ID(regval);
+                   larbID = F_INT_ID_TF_LARB_ID(regval) - 1;
+			
+                   M4UMSG("translation fault: port=%s, fault_mva=0x%x\n", m4u_get_port_name(larb_port_2_m4u_port(larbID, portID)), faultMva);
+               }
 				
                 m4u_print_active_port();
                 //m4u_memory_usage(); 
                 m4u_dump_mva_info();
+
+                m4u_dump_main_tlb_des();
+                m4u_dump_pfh_tlb_des();				
             }
         }
 		
@@ -2976,6 +2986,58 @@ static int m4u_fill_pagetable(const M4U_MODULE_ID_ENUM eModuleID, const unsigned
     
 }
 
+#ifdef MTK_M4U_EXT_PAGE_TABLE 
+/* add for ovl: 
+   this function will build pagetable for framebuffer,
+   its mva==pa. so when switch from LK to kernel, 
+   ovl just switch to virtual mode, no need to modify address register
+
+!!!! NOTES:
+    1. only be used by ovl for frame buffer 
+    2. currently, total mva is 1G
+        frame buffer pa is > 0xf0000000
+        so it won't be corrupted by other m4u_alloc_mva()
+*/
+int m4u_fill_linear_pagetable(unsigned int pa, unsigned int size)
+{
+    int page_num, i;
+    unsigned int mva = pa&(~M4U_PAGE_MASK);
+    unsigned int *pPt = mva_pteAddr_nonsec(mva);
+
+    page_num = M4U_GET_PAGE_NUM(pa, size);
+    pa = mva;   //page align
+
+    if(pa < 0x20000000)
+    {
+        M4UMSG("error: m4u_fill_linear_pagetable fail: pa=0x%x < 0x20000000\n", pa);
+        return -1;
+    }
+
+    for(i=0; i<page_num; i++)
+    {
+        pPt[i] = pa | F_DESC_VALID | F_DESC_NONSEC(1);
+        pa += M4U_PAGE_SIZE;
+    }
+
+    return 0;
+}
+
+int m4u_erase_linear_pagetable(unsigned int pa, unsigned int size)
+{
+    int page_num, i;
+    unsigned int *pPt = mva_pteAddr_nonsec(pa);
+    
+    page_num = M4U_GET_PAGE_NUM(pa, size);
+
+    for(i=0; i<page_num; i++)
+    {
+        pPt[i] = 0;
+    }
+
+    return 0;
+}
+
+#endif
 
 static int m4u_perf_timer_on(void)
 {

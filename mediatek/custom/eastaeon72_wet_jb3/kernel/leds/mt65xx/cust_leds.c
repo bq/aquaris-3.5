@@ -46,7 +46,6 @@ unsigned int Cust_SetBacklight(int level, int div)
     return 0;
 }
 
-extern int g_dispSearchLcm;
 static int custom_disp_bls_set_backlight( unsigned int  value)
 {
 	int err = 0xff;
@@ -58,11 +57,6 @@ static int custom_disp_bls_set_backlight( unsigned int  value)
 	static unsigned int s_bBacklightOn = 1; 
 	static unsigned int	g_ledCurrPulseCount = 0;
 
-	if(g_dispSearchLcm == 0)
-	{
-		mt_set_gpio_out(GPIO_LCD_PULSE_CONTRL, GPIO_OUT_ZERO);
-		return 0;
-	}
 	
 	if(value > LCD_PWM_MOD_VALUE)
 		value = LCD_PWM_MOD_VALUE;

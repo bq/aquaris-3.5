@@ -280,7 +280,7 @@ void DSI_Config_VDO_Timing(LCM_PARAMS *lcm_params);
 void DSI_PHY_clk_setting(LCM_PARAMS *lcm_params);
 //void DSI_PHY_clk_setting(unsigned int div1, unsigned int div2, unsigned int lane_no);
 //#endif
-void DSI_PHY_clk_switch(BOOL on);
+void DSI_PHY_clk_switch(BOOL on, LCM_PARAMS *lcm_params);
 
 void DSI_PHY_TIMCONFIG(LCM_PARAMS *lcm_params);
 

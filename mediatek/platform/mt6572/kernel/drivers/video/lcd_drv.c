@@ -9,16 +9,18 @@
         #define ENABLE_LCD_INTERRUPT 1
     #endif
 
+#include <linux/delay.h>
+#include <linux/sched.h>
+#include <linux/module.h>
+#include <linux/dma-mapping.h>
+
 #include "ddp_reg.h"
 #include "ddp_debug.h"
 #include "lcd_reg.h"
 #include "lcd_drv.h"
-#include <linux/delay.h>
-#include <linux/sched.h>
-#include <linux/module.h>
-#include <disp_drv_log.h>
-#include <linux/dma-mapping.h>
-#include <disp_drv_platform.h>
+
+#include "disp_drv_log.h"
+#include "disp_drv_platform.h"
 
 #include <linux/hrtimer.h>
 
@@ -170,11 +172,12 @@ static void _LCD_MUTEX_IRQ_Handler(unsigned int param)
 static irqreturn_t _LCD_InterruptHandler(int irq, void *dev_id)
 {   
    LCD_REG_INTERRUPT status = LCD_REG->INT_STATUS;
+   MMProfileLogEx(DDP_MMP_Events.ROT_IRQ, MMProfileFlagPulse, AS_UINT32(&status), 0);
    
    if (status.COMPLETED)
    {
       ///write clear COMPLETED interrupt
-      OUTREGBIT(LCD_REG_INTERRUPT,LCD_REG->INT_STATUS,COMPLETED,0);
+      status.COMPLETED = 1;
 
 #ifdef CONFIG_MTPROF_APPLAUNCH  // eng enable, user disable   	
       LOG_PRINT(ANDROID_LOG_INFO, "AppLaunch", "LCD frame buffer update done !\n");
@@ -196,7 +199,7 @@ static irqreturn_t _LCD_InterruptHandler(int irq, void *dev_id)
       DBG_OnLcdDone();
       
       //LCD_REG->INT_STATUS.CMDQ_COMPLETED = 0;
-      OUTREGBIT(LCD_REG_INTERRUPT,LCD_REG->INT_STATUS,CMDQ_COMPLETED,0);
+      status.CMDQ_COMPLETED = 1;
       
       wake_up_interruptible(&_lcd_wait_queue);
 
@@ -205,12 +208,12 @@ static irqreturn_t _LCD_InterruptHandler(int irq, void *dev_id)
       //MASKREG32(&LCD_REG->INT_STATUS, 0x2, 0x0);
    }
    
-   if (status.SYNC)// this is TE mode 0 interrupt
+   if (status.TE)// this is TE mode 0 interrupt
    {
       DBG_OnTeDelayDone();
       
       // Write clear TE
-      OUTREGBIT(LCD_REG_INTERRUPT,LCD_REG->INT_STATUS,TE,0);
+      status.TE = 1;
 
       if(_lcdContext.pIntCallback)
          _lcdContext.pIntCallback(DISP_LCD_SYNC_INT);
@@ -228,7 +231,16 @@ static irqreturn_t _LCD_InterruptHandler(int irq, void *dev_id)
 #endif  
       DBG_OnTeDelayDone();
    }
-   LCD_OUTREG32(&LCD_REG->INT_STATUS, 0);
+
+   if (status.HTT)
+   {
+      status.HTT = 1;
+   }
+   if (status.SYNC)
+   {
+      status.SYNC = 1;
+   }
+   LCD_OUTREG32(&LCD_REG->INT_STATUS, ~(AS_UINT32(&status)));
    
    return IRQ_HANDLED;
 }

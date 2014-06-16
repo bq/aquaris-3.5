@@ -354,6 +354,8 @@ MBOOL Hal3AYuv::sendCommand(ECmd_T const eCmd, MINT32 const i4Arg)
         setParams(old_para);
         m_bForceUpdatParam = FALSE;
         
+        m_bExifFlashOn = 0;
+        
         return MTRUE;
     }
     else if  (eCmd == ECmd_Uninit)
@@ -373,7 +375,8 @@ MBOOL Hal3AYuv::sendCommand(ECmd_T const eCmd, MINT32 const i4Arg)
     {
         if (m_pStrobeDrvObj)
         {
-            if (isAEFlashOn())
+            MBOOL fgFlashOn = (eShotMode_ZsdShot == m_rParam.u4ShotMode) ? m_isFlashOnCapture : isAEFlashOn();
+            if (fgFlashOn)
             {
                 m_strobecurrent_BV = m_strobeTrigerBV;
                 // updated in isAEFlashOn
@@ -393,6 +396,7 @@ MBOOL Hal3AYuv::sendCommand(ECmd_T const eCmd, MINT32 const i4Arg)
                     m_preflashFrmCnt = mflashcnt - 1;
                     m_preflashFrmCnt = m_preflashFrmCnt < mflashcnt ? m_preflashFrmCnt : 0;
                     m_bFlashActive = TRUE;
+                    m_bExifFlashOn = 1;
                 }
             }
             else
@@ -410,6 +414,7 @@ MBOOL Hal3AYuv::sendCommand(ECmd_T const eCmd, MINT32 const i4Arg)
     else if (eCmd == ECmd_PrecaptureEnd)
     {
         resetReadyToCapture();
+        m_isFlashOnCapture = 0;
         return MTRUE;
     }
     else if (eCmd == ECmd_CaptureStart)
@@ -508,12 +513,14 @@ MBOOL Hal3AYuv::sendCommand(ECmd_T const eCmd, MINT32 const i4Arg)
                     {
                         m_pAFYuvCallBack->doNotifyCb(I3ACallBack::eID_NOTIFY_AF_FOCUSED, 1, 0, 0);
                         m_i4AutoFocus = FALSE;
+                        setAFLampOnOff(MFALSE);
                         MY_LOG("ECmd_Update: SAF(SENSOR_AF_FOCUSED)\n");
                     }
                     else if (m_i4AutoFocusTimeout == 0)
                     {
                         m_pAFYuvCallBack->doNotifyCb(I3ACallBack::eID_NOTIFY_AF_FOCUSED, 0, 0, 0);
                         m_i4AutoFocus = FALSE;
+                        setAFLampOnOff(MFALSE);
                         MY_LOG("ECmd_Update: SAF(TimeOut)\n");
                     }
 
@@ -637,9 +644,7 @@ MBOOL Hal3AYuv::setParams(Param_T const &rNewParam)
 
     MY_LOG("[%s()] + \n", __FUNCTION__);
 
-    i4SceneModeUpdate = 
-    rNewParam.u4SceneMode == SCENE_MODE_OFF ||
-    rNewParam.u4SceneMode == SCENE_MODE_NORMAL;
+    i4SceneModeUpdate = rNewParam.u4SceneMode != SCENE_MODE_HDR;
 
     i4SceneModeChg = m_rParam.u4SceneMode != rNewParam.u4SceneMode || m_bForceUpdatParam;
 
@@ -919,6 +924,7 @@ MBOOL Hal3AYuv::autoFocus()
 
     if ((m_rParam.u4AfMode != AF_MODE_AFC) && (m_rParam.u4AfMode != AF_MODE_AFC_VIDEO))
     {    
+        setAFLampOnOff(MTRUE);
         m_pSensorHal->sendCommand(static_cast<halSensorDev_e>(m_i4SensorDev),SENSOR_CMD_SET_YUV_CANCEL_AF,0,0,0); 
         m_pSensorHal->sendCommand(static_cast<halSensorDev_e>(m_i4SensorDev),SENSOR_CMD_SET_YUV_AF_WINDOW,(int)m_AFzone,0,0);     
         m_pSensorHal->sendCommand(static_cast<halSensorDev_e>(m_i4SensorDev),SENSOR_CMD_SET_YUV_SINGLE_FOCUS_MODE,0,0,0); 
@@ -999,16 +1005,16 @@ MBOOL Hal3AYuv::set3AEXIFInfo(IBaseCamExif *pIBaseCamExif) const
     m_pSensorHal->sendCommand(static_cast<halSensorDev_e>(m_i4SensorDev),SENSOR_CMD_GET_YUV_EXIF_INFO,(int)&mSensorInfo,0,0);             
     
     MY_LOG("FNumber=%d, AEISOSpeed=%d, AWBMode=%d, CapExposureTime=%d, FlashLightTimeus=%d, RealISOValue=%d\n", 
-           mSensorInfo.FNumber, mSensorInfo.AEISOSpeed, mSensorInfo.AWBMode, 
-           mSensorInfo.CapExposureTime, mSensorInfo.FlashLightTimeus, mSensorInfo.RealISOValue);
+           mSensorInfo.FNumber, m_rParam.u4IsoSpeedMode, m_rParam.u4AwbMode, 
+           mSensorInfo.CapExposureTime, m_bExifFlashOn, mSensorInfo.RealISOValue);
     
     rEXIFInfo.u4FNumber = mSensorInfo.FNumber>0 ? mSensorInfo.FNumber : 28;
     rEXIFInfo.u4FocalLength = 350;
-    rEXIFInfo.u4SceneMode = m_rParam.u4SceneMode>0 ? m_rParam.u4SceneMode : 0;
-    rEXIFInfo.u4AWBMode = mSensorInfo.AWBMode>0 ? mSensorInfo.AWBMode : 0;
+    rEXIFInfo.u4SceneMode = m_rParam.u4SceneMode;
+    rEXIFInfo.u4AWBMode = m_rParam.u4AwbMode;
     rEXIFInfo.u4CapExposureTime = mSensorInfo.CapExposureTime>0? mSensorInfo.CapExposureTime : 0;
-    rEXIFInfo.u4FlashLightTimeus = mSensorInfo.FlashLightTimeus>0? mSensorInfo.FlashLightTimeus : 0;
-    rEXIFInfo.u4AEISOSpeed = mapEnumToISO(mSensorInfo.AEISOSpeed);
+    rEXIFInfo.u4FlashLightTimeus = m_bExifFlashOn; //mSensorInfo.FlashLightTimeus>0? mSensorInfo.FlashLightTimeus : 0;
+    rEXIFInfo.u4AEISOSpeed = m_rParam.u4IsoSpeedMode;
     rEXIFInfo.i4AEExpBias = 0;
     
     pIBaseCamExif->set3AEXIFInfo(&rEXIFInfo);
@@ -1689,6 +1695,47 @@ MBOOL Hal3AYuv::resetAFAEWindow()
     return MTRUE;
 }
 
+MINT32 Hal3AYuv::isNeedFiringFlash()
+{
+    MY_LOG("[%s]\n", __FUNCTION__);
+
+    MBOOL bFlashOn;
+
+    if (m_rParam.u4StrobeMode == LIB3A_FLASH_MODE_FORCE_OFF)
+    {
+        MY_LOG("[%s] FLASHLIGHT_FORCE_OFF\n", __FUNCTION__);
+        bFlashOn = 0;
+    }
+    else if (m_rParam.u4StrobeMode == LIB3A_FLASH_MODE_FORCE_ON)
+    {
+        MY_LOG("[%s] FLASHLIGHT_FORCE_ON\n", __FUNCTION__);
+        bFlashOn = 1;
+    }
+    else //auto
+    {
+        if (isAEFlashOn())
+        {
+            MY_LOG("[%s] isAEFlashOn ON\n", __FUNCTION__);
+            bFlashOn = 1;
+        }
+        else
+        {
+            MY_LOG("[%s] isAEFlashOn OFF\n", __FUNCTION__);
+            bFlashOn = 0;
+        }
+    }
+    
+#if defined(DUMMY_FLASHLIGHT)
+    MY_LOG("[%s] DUMMY_FLASHLIGHT\n", __FUNCTION__);
+    bFlashOn = 0;
+#endif
+
+    m_isFlashOnCapture = bFlashOn;
+
+    return bFlashOn;
+
+}
+
 /*******************************************************************************
 *
 ********************************************************************************/
@@ -1722,6 +1769,62 @@ MINT32 Hal3AYuv::isAEFlashOn()
         }
     }    
     return rtn;
+}
+
+MINT32 Hal3AYuv::setAFLampOnOff(MBOOL bOnOff)
+{
+    MINT32 i4Ret = S_3A_OK;
+    MINT32 i4AfLampSupport = NSCamCustom::custom_GetYuvAfLampSupport();
+
+    if (m_pStrobeDrvObj && i4AfLampSupport)
+    {
+        if (m_rParam.u4StrobeMode != FLASHLIGHT_TORCH)
+        {
+            MY_LOG("[%s] bOnOff(%d), StrobeMode(%d)\n", __FUNCTION__, bOnOff, m_rParam.u4StrobeMode);
+            if (bOnOff)
+            {
+                MBOOL fgFlashOn = isAEFlashOn();
+                if (fgFlashOn)
+                {
+                    //ON flashlight
+                    if (m_pStrobeDrvObj->setTimeOutTime(0) == MHAL_NO_ERROR)
+                    {
+                        MY_LOG("setTimeOutTime: 0\n");
+                    }
+                    if (m_pStrobeDrvObj->setDuty(m_strobeWidth) == MHAL_NO_ERROR)
+                    {
+                        MY_LOG("setLevel:%d\n", m_strobeWidth);
+                    }
+                    if (m_pStrobeDrvObj->setOnOff(1) == MHAL_NO_ERROR)
+                    {
+                        MY_LOG("[%s] setFire ON\n", __FUNCTION__);
+                    }
+                }
+                else
+                {
+                    MY_LOG("[%s] No need to turn on AF lamp.\n", __FUNCTION__);
+                }
+            }
+            else
+            {
+                if (m_pStrobeDrvObj->setOnOff(0) == MHAL_NO_ERROR)
+                {
+                    MY_LOG("[%s] setFire OFF\n", __FUNCTION__);
+                }
+            }
+        }
+        else
+        {
+            MY_LOG("[%s] FLASHLIGHT_TORCH, skip\n", __FUNCTION__);
+        }
+    }
+    else
+    {
+        MY_LOG("[%s] strobe object(0x%08x), AfLampSupport(%d)\n", __FUNCTION__, m_pStrobeDrvObj, i4AfLampSupport);
+        i4Ret = E_3A_NULL_OBJECT;
+    }
+
+    return i4Ret;
 }
 
 /*******************************************************************************

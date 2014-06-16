@@ -708,8 +708,7 @@ void ccci_rpc_work_helper(int md_id, int *p_pkt_num, RPC_PKT pkt[], RPC_BUF *p_r
 			if(get_dram_type_clk(&dram_clk, &dram_type)) {
 				tmp_data[0] = FS_FUNC_FAIL;
 				goto err2;
-			}
-			else {
+			} else {
 				tmp_data[0] = 0;
 				CCCI_MSG_INF(md_id, "rpc", "[0x%08X]: dram_clk: %d, dram_type:%d \n",
 					p_rpc_buf->op_id, dram_clk, dram_type);	
@@ -766,8 +765,7 @@ void ccci_rpc_work_helper(int md_id, int *p_pkt_num, RPC_PKT pkt[], RPC_BUF *p_r
 				CCCI_MSG_INF(md_id, "rpc", "Fail alloc Mem for [0x%X]!\n", p_rpc_buf->op_id);
 				tmp_data[0] = FS_ERROR_RESERVED;
 				goto err3;
-			}
-			else {
+			} else {
 				memcpy(eint_name, (unsigned char*)(pkt[0].buf), name_len);
 			}
 			
@@ -795,6 +793,37 @@ void ccci_rpc_work_helper(int md_id, int *p_pkt_num, RPC_PKT pkt[], RPC_BUF *p_r
 			break;
 			
 		err3:
+			pkt_num = 0;
+			pkt[pkt_num].len = sizeof(unsigned int);
+			pkt[pkt_num++].buf = (void*) &tmp_data[0];
+			pkt[pkt_num].len = sizeof(unsigned int);
+			pkt[pkt_num++].buf = (void*) &tmp_data[0];
+			break;
+		}
+		
+		case IPC_RPC_GET_GPIO_VAL_OP:
+		case IPC_RPC_GET_ADC_VAL_OP:
+		{
+			unsigned int num = 0;
+			int val = 0;
+			
+			if(pkt_num != 1)	{
+				CCCI_MSG_INF(md_id, "rpc", "invalid parameter for [0x%X]: pkt_num=%d!\n",
+					p_rpc_buf->op_id, pkt_num);
+				tmp_data[0] = FS_PARAM_ERROR;
+				goto err4;
+			}
+
+			num = *(unsigned int*)(pkt[0].buf);
+			if(p_rpc_buf->op_id == IPC_RPC_GET_GPIO_VAL_OP) {
+				val = get_md_gpio_val(md_id, num);
+			} else if (p_rpc_buf->op_id == IPC_RPC_GET_ADC_VAL_OP) {
+				val = get_md_adc_val(md_id, num);
+			}
+			tmp_data[0] = val;
+			CCCI_MSG_INF(md_id, "rpc", "[0x%X]: num=%d, val=%d!\n", p_rpc_buf->op_id, num, val);
+
+		err4:
 			pkt_num = 0;
 			pkt[pkt_num].len = sizeof(unsigned int);
 			pkt[pkt_num++].buf = (void*) &tmp_data[0];
@@ -1887,7 +1916,9 @@ void md_dsp_wdt_irq_dis(int md_id)
 	}
 
 	if(atomic_read(&wdt_irq_en_count[md_id]) == 1) {
-		disable_irq(irq_id);
+		/*may be called in isr, so use disable_irq_nosync.
+		if use disable_irq in isr, system will hang*/
+		disable_irq_nosync(irq_id);
 		atomic_dec(&wdt_irq_en_count[md_id]);
 	}
 
@@ -1937,9 +1968,12 @@ static irqreturn_t md_wdt_isr(int irq, void *data __always_unused)
 			stop_md_wdt_recov_timer(MD_SYS1);
 			md_wdt_has_processed[MD_SYS1] = 1;
 			if(md1_rgu_base) {
+				#ifdef ENABLE_MD_WDT_DBG
 				sta = ccci_read32(WDT_MD_STA(md1_rgu_base));
 				ccci_write32(WDT_MD_MODE(md1_rgu_base), WDT_MD_MODE_KEY);
+				#endif
 				md_id = MD_SYS1;
+				md_dsp_wdt_irq_dis(md_id);
 			}
 			break;
 			
@@ -1948,9 +1982,15 @@ static irqreturn_t md_wdt_isr(int irq, void *data __always_unused)
 	}
 	#endif
 
+	#ifdef ENABLE_MD_WDT_DBG
 	CCCI_MSG_INF(md_id, "ctl", "MD_WDT_STA=%04x(md%d_irq=%d)\n", sta, (md_id+1), irq);
+	#else
+	CCCI_MSG_INF(md_id, "ctl", "MD_WDT_ISR(md%d_irq=%d)\n", (md_id+1), irq);
+	#endif
 
-	if(sta!=0)
+#ifdef ENABLE_MD_WDT_DBG
+	if(sta != 0)
+#endif
 		md_wdt_notify(md_id);
 
 	return IRQ_HANDLED;
@@ -2254,6 +2294,7 @@ int let_md_go(int md_id)
 	
 	if (md_id == MD_SYS1) {
 		md_wdt_has_processed[MD_SYS1] = 0;
+		md_dsp_wdt_irq_en(MD_SYS1);
 		ret = ungate_md1();
 	}
 

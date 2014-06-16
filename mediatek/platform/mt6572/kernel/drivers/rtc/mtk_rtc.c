@@ -28,6 +28,8 @@
 #include <mach/mt_typedefs.h>
 #include <mach/mt_pmic_wrap.h>
 #include <mach/upmu_hw.h>
+#include <mach/mt_gpio.h>
+
 #if defined MTK_KERNEL_POWER_OFF_CHARGING
 #include <mach/system.h>
 #include <mach/mt_boot.h>
@@ -571,6 +573,13 @@ void rtc_bbpu_power_down(void)
 	bbpu = RTC_BBPU_KEY | RTC_BBPU_AUTO | RTC_BBPU_PWREN;
 	rtc_write(RTC_BBPU, bbpu);
 	rtc_write_trigger();
+
+	//modify srclken to low	for optimize the power off leakage
+	#define GPIO_SRCLKEN_PIN GPIO12 //for readability
+	mt_set_gpio_dir(GPIO_SRCLKEN_PIN, GPIO_DIR_OUT);	
+	mt_set_gpio_out(GPIO_SRCLKEN_PIN, GPIO_OUT_ZERO);	
+	mt_set_gpio_mode(GPIO_SRCLKEN_PIN, GPIO_MODE_GPIO);		
+	
 	spin_unlock_irqrestore(&rtc_lock, flags);
 }
 
@@ -806,9 +815,9 @@ static int rtc_ops_read_time(struct device *dev, struct rtc_time *tm)
 	u16 bbpu;
 
 	spin_lock_irqsave(&rtc_lock, flags);
-//	bbpu = rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD;
-//	rtc_write(RTC_BBPU, bbpu);
-//	rtc_write_trigger();
+	bbpu = rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD;
+	rtc_write(RTC_BBPU, bbpu);
+	rtc_write_trigger();
 	tm->tm_sec = rtc_read(RTC_TC_SEC);
 	tm->tm_min = rtc_read(RTC_TC_MIN);
 	tm->tm_hour = rtc_read(RTC_TC_HOU);
@@ -958,18 +967,18 @@ static int rtc_ops_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	/* disable alarm and clear Power-On Alarm bit */
 	irqen = rtc_read(RTC_IRQ_EN) & ~RTC_IRQ_EN_AL;
 	pdn2 = rtc_read(RTC_PDN2) & ~0x0010;
+	rtc_write(RTC_AL_YEA, tm->tm_year);
+	rtc_write(RTC_AL_MTH, (rtc_read(RTC_AL_MTH)&0xff00)|tm->tm_mon);
+	rtc_write(RTC_AL_DOM, (rtc_read(RTC_AL_DOM)&0xff00)|tm->tm_mday);
+	rtc_write(RTC_AL_HOU, (rtc_read(RTC_AL_HOU)&0xff00)|tm->tm_hour);
+	rtc_write(RTC_AL_MIN, tm->tm_min);
+	rtc_write(RTC_AL_SEC, tm->tm_sec);
 	rtc_write(RTC_IRQ_EN, irqen);
 	rtc_write(RTC_PDN2, pdn2);
 	rtc_write_trigger();
 	irqsta = rtc_read(RTC_IRQ_STA);		/* read clear */
 
 	if (alm->enabled) {
-		rtc_write(RTC_AL_YEA, tm->tm_year);
-		rtc_write(RTC_AL_MTH, (rtc_read(RTC_AL_MTH)&0xff00)|tm->tm_mon);
-		rtc_write(RTC_AL_DOM, (rtc_read(RTC_AL_DOM)&0xff00)|tm->tm_mday);
-		rtc_write(RTC_AL_HOU, (rtc_read(RTC_AL_HOU)&0xff00)|tm->tm_hour);
-		rtc_write(RTC_AL_MIN, tm->tm_min);
-		rtc_write(RTC_AL_SEC, tm->tm_sec);
 		rtc_write(RTC_AL_MASK, 0x0010);		/* mask DOW */
 		rtc_write_trigger();
 		irqen = rtc_read(RTC_IRQ_EN) | RTC_IRQ_EN_ONESHOT_AL;
@@ -981,11 +990,44 @@ static int rtc_ops_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	return 0;
 }
 
+static int rtc_ops_ioctl(struct device *dev, unsigned int cmd,
+			    unsigned long arg)
+{
+	u16 pdn2;
+
+	//dump_stack();
+	rtc_xinfo("rtc_ops_ioctl cmd=%d\n", cmd);
+	switch (cmd) {
+#if defined(RTC_2SEC_REBOOT_ENABLE)
+		case RTC_AUTOBOOT_ON:
+		{
+			pdn2 = rtc_read(RTC_PDN2) & ~(0x1 << 7); //bit 7 for auto boot;
+			rtc_write(RTC_PDN2, pdn2);
+			rtc_write_trigger();
+			rtc_xinfo("rtc_ops_ioctl cmd=RTC_AUTOBOOT_ON\n");
+			return 0;
+		}
+		case RTC_AUTOBOOT_OFF: //IPO shutdown
+		{
+			pdn2 = rtc_read(RTC_PDN2) | (0x1 << 7);
+			rtc_write(RTC_PDN2, pdn2);
+			rtc_write_trigger();
+			rtc_xinfo("rtc_ops_ioctl cmd=RTC_AUTOBOOT_OFF\n");
+			return 0;
+		}
+#endif//RTC_2SEC_REBOOT_ENABLE
+		default:
+			break;
+	}
+	return -ENOIOCTLCMD;
+}
+
 static struct rtc_class_ops rtc_ops = {
 	.read_time	= rtc_ops_read_time,
 	.set_time	= rtc_ops_set_time,
 	.read_alarm	= rtc_ops_read_alarm,
 	.set_alarm	= rtc_ops_set_alarm,
+	.ioctl		= rtc_ops_ioctl,
 };
 
 static int rtc_pdrv_probe(struct platform_device *pdev)

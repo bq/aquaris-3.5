@@ -16,7 +16,7 @@
 
 
 #define SMI_LOG_TAG "SMI"
-#define SMI_DEFAULT_VR
+//#define SMI_DEFAULT_VR
 
 unsigned int gLarbBaseAddr[SMI_LARB_NR] = 
     {LARB0_BASE}; 
@@ -194,6 +194,13 @@ static void on_larb_power_on(struct larb_monitor *h, int larb_idx)
         p_conf.scenario = SMI_BWC_SCEN_VR1066;
         smi_bwc_config(&p_conf);
     }  
+#else
+    {
+        MTK_SMI_BWC_CONFIG p_conf;
+        p_conf.b_reduce_command_buffer = 1;
+        p_conf.scenario = SMI_BWC_SCEN_NORMAL;
+        smi_bwc_config(&p_conf);
+    }  
 #endif
 }
 
@@ -294,7 +301,7 @@ static int smi_bwc_config( MTK_SMI_BWC_CONFIG* p_conf )
         break;
 #endif        
     case SMI_BWC_SCEN_VR1066:
-        SMIMSG("set as SMI_BWC_SCEN_VR1066");		
+        SMIMSG("set as SMI_BWC_SCEN_VR1066\n");		
 #if 0
         wdata = 432; //BW limit = x/4096
         wdata |= (1<<11); // bw filter enable
@@ -311,7 +318,7 @@ static int smi_bwc_config( MTK_SMI_BWC_CONFIG* p_conf )
 #endif
 
         wdata = 2026; //BW limit 
-        wdata |= (1<<11); // bw filter enable, soft mode
+        //wdata |= (1<<11); // bw filter enable, soft mode
         M4U_WriteReg32( 0x0, REG_SMI_L1ARB0, wdata ); 
 
         M4U_WriteReg32( larb_base, SMI_LARB_OSTD_CTRL_EN, 0xfffff );		
@@ -346,10 +353,26 @@ static int smi_bwc_config( MTK_SMI_BWC_CONFIG* p_conf )
         
     case SMI_BWC_SCEN_NORMAL:
     default:
-        SMIMSG("set as SMI_BWC_SCEN_NORMAL");				
-        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_CTRL_EN, 0x0 );	
-        M4U_WriteReg32( 0x0, REG_SMI_L1ARB0, 0x0   );   //larb0 venc:default
-        M4U_WriteReg32( 0x0, REG_SMI_L1ARB1, 0x0   );   //larb1 vdec:default
+        SMIMSG("set as SMI_BWC_SCEN_NORMAL\n");				
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_CTRL_EN, 0xfffff );  //	SMI_LARB_OSTD_CTRL_EN can't disable when mm module not in idle.
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x00, 0x1f ); 
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x04, 0x1f ); 
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x08, 0x1f ); 		
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x10, 0x1f ); 
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x14, 0x1f ); 		
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x18, 0x1f ); 
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x1c, 0x1f ); 
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x20, 0x1f ); 
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x24, 0x1f ); 
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x28, 0x1f ); 		
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x2c, 0x1f ); 		
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x30, 0x1f ); 		
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x34, 0x1f ); 		
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x38, 0x1f ); 				
+        M4U_WriteReg32( larb_base, SMI_LARB_OSTD_PORT+0x3c, 0x1f ); 	
+		
+        M4U_WriteReg32( 0x0, REG_SMI_L1ARB0, 0x0   );   //larb0 change to default
+        M4U_WriteReg32( 0x0, REG_SMI_L1ARB1, 0x0   );   //larb1 change to default
 
         {
             /*SMI COMMON reduce command buffer*/
@@ -590,6 +613,7 @@ static int smi_probe(struct platform_device *pdev)
 
     mau_init();
 
+#ifndef MTK_M4U_EXT_PAGE_TABLE
     {
         MTK_MAU_CONFIG mau_disp;
         mau_disp.entry = 0;
@@ -602,6 +626,7 @@ static int smi_probe(struct platform_device *pdev)
         mau_disp.monitor_write = 1;
         mau_config(&mau_disp);
     }
+#endif    
 
 #ifdef SMI_DEFAULT_VR
     {
@@ -610,6 +635,13 @@ static int smi_probe(struct platform_device *pdev)
         p_conf.scenario = SMI_BWC_SCEN_VR1066;
         smi_bwc_config(&p_conf);
     }
+#else
+    {
+        MTK_SMI_BWC_CONFIG p_conf;
+        p_conf.b_reduce_command_buffer = 1;
+        p_conf.scenario = SMI_BWC_SCEN_NORMAL;
+        smi_bwc_config(&p_conf);
+    }  
 #endif
 
     //dump_smi_register();

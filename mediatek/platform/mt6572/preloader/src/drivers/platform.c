@@ -78,6 +78,10 @@ ulong g_boot_time;
 kal_bool kpoc_flag = false;
 #endif
 
+#if defined(CFG_USB_AUTO_DETECT)
+bool g_usbdl_flag;
+#endif
+
 /*============================================================================*/
 /* EXTERNAL FUNCTIONS                                                         */
 /*============================================================================*/
@@ -281,7 +285,40 @@ void platform_modem_download(void)
 }
 #endif
 
-#if CFG_EMERGENCY_DL_SUPPORT
+#if defined(CFG_USB_AUTO_DETECT)
+void platform_usbdl_flag_check()
+{
+    U32 usbdlreg = 0;
+    usbdlreg = DRV_Reg32(SRAMROM_USBDL_REG);
+     /*Set global variable to record the usbdl flag*/
+    if(usbdlreg & USBDL_BIT_EN)
+        g_usbdl_flag = 1;
+    else
+        g_usbdl_flag = 0;
+}
+
+void platform_usb_auto_detect_flow()
+{
+
+    print("USB DL Flag is %d when enter preloader  \n",g_usbdl_flag);
+
+    /*usb download flag haven't set */
+	if(g_usbdl_flag == 0){
+        /*set up usbdl flag*/
+        platform_safe_mode(1,CFG_USB_AUTO_DETECT_TIMEOUT_MS);
+        print("Preloader going reset and trigger BROM usb auto detectiton!!\n");
+
+        /*WDT by pass powerkey reboot*/
+        mtk_arch_reset(0);
+
+	}else{
+    /*usb download flag have been set*/
+    }
+
+}
+#endif
+
+
 void platform_safe_mode(int en, u32 timeout)
 {
     U32 usbdlreg;
@@ -312,6 +349,7 @@ void platform_safe_mode(int en, u32 timeout)
     return;
 }
 
+#if CFG_EMERGENCY_DL_SUPPORT
 void platform_emergency_download(u32 timeout)
 {
     /* enter download mode */
@@ -324,9 +362,6 @@ void platform_emergency_download(u32 timeout)
 
     while(1);
 }
-#else
-void platform_safe_mode(int en, u32 timeout){}
-#define platform_emergency_download(x)  do{}while(0)
 #endif
 
 
@@ -385,11 +420,19 @@ static boot_reason_t platform_boot_status(void)
     }
 #endif
 
-#ifndef EVB_PLATFORM
+#ifndef CFG_EVB_PLATFORM
     if (usb_accessory_in()) {
         print("%s USB/charger boot!\n", MOD);
         return BR_USB;
     }
+#ifdef RTC_2SEC_REBOOT_ENABLE
+    //need to unlock rtc PROT
+    //check after rtc_boot_check() initial finish.
+    if (rtc_2sec_reboot_check()) {
+        print("%s 2sec reboot!\n", MOD);
+        return BR_2SEC_REBOOT;
+    }
+#endif //#ifdef RTC_2SEC_REBOOT_ENABLE
 
     print("%s Unknown boot!\n", MOD);
     pl_power_off();
@@ -566,21 +609,22 @@ void platform_pre_init(void)
     pmic_ret = pmic_init();
 
 //enable long press reboot function***************
-#ifndef EVB_PLATFORM
 #ifdef KPD_PMIC_LPRST_TD
 	#ifdef ONEKEY_REBOOT_NORMAL_MODE_PL
+			printf("ONEKEY_REBOOT_NORMAL_MODE_PL OK\n");
 			pmic_config_interface(TOP_RST_MISC, 0x01, PMIC_RG_PWRKEY_RST_EN_MASK, PMIC_RG_PWRKEY_RST_EN_SHIFT);//pmic_config_interface(TOP_RST_MISC, 0x01, PMIC_RG_PWRKEY_RST_EN_MASK, PMIC_RG_PWRKEY_RST_EN_SHIFT);
-			pmic_config_interface(GPIO_SMT_CON3,0x01, PMIC_RG_HOMEKEY_PUEN_MASK, PMIC_RG_HOMEKEY_PUEN_SHIFT);//pull up homekey pin of PMIC for 89 project
+			pmic_config_interface(STRUP_CON3,	0x01, PMIC_RG_FCHR_PU_EN_MASK, PMIC_RG_FCHR_PU_EN_SHIFT);//pull up homekey pin of PMIC for 72 project
 			pmic_config_interface(TOP_RST_MISC, (U32)KPD_PMIC_LPRST_TD, PMIC_RG_PWRKEY_RST_TD_MASK, PMIC_RG_PWRKEY_RST_TD_SHIFT);
 	#endif
 
 	#ifdef TWOKEY_REBOOT_NORMAL_MODE_PL
+			printf("TWOKEY_REBOOT_NORMAL_MODE_PL OK\n");
 			pmic_config_interface(TOP_RST_MISC, 0x01, PMIC_RG_PWRKEY_RST_EN_MASK, PMIC_RG_PWRKEY_RST_EN_SHIFT);//pmic package function for long press reboot function setting//
 			pmic_config_interface(TOP_RST_MISC, 0x01, PMIC_RG_HOMEKEY_RST_EN_MASK, PMIC_RG_HOMEKEY_RST_EN_SHIFT);;//pmic_config_interface(TOP_RST_MISC, 0x01, PMIC_RG_HOMEKEY_RST_EN_MASK, PMIC_RG_HOMEKEY_RST_EN_SHIFT);
-			pmic_config_interface(GPIO_SMT_CON3,0x01, PMIC_RG_HOMEKEY_PUEN_MASK, PMIC_RG_HOMEKEY_PUEN_SHIFT);//pull up homekey pin of PMIC for 89 project
+			pmic_config_interface(STRUP_CON3,	0x01, PMIC_RG_FCHR_PU_EN_MASK, PMIC_RG_FCHR_PU_EN_SHIFT);//pull up homekey pin of PMIC for 72 project
+			pmic_config_interface(STRUP_CON3,	0, PMIC_RG_FCHR_KEYDET_EN_MASK, PMIC_RG_FCHR_KEYDET_EN_SHIFT);//disable homekey pin FCHR mode of PMIC for 72 project
 			pmic_config_interface(TOP_RST_MISC, (U32)KPD_PMIC_LPRST_TD, PMIC_RG_PWRKEY_RST_TD_MASK, PMIC_RG_PWRKEY_RST_TD_SHIFT);
 	#endif
-#endif
 #endif
 //************************************************
     #ifdef PL_PROFILING
@@ -659,7 +703,11 @@ void platform_init(void)
     #endif
 
     g_boot_reason = reason = platform_boot_status();
-    if (reason == BR_RTC || reason == BR_POWER_KEY || reason == BR_USB || reason == BR_WDT || reason == BR_WDT_BY_PASS_PWK)
+    if (reason == BR_RTC || reason == BR_POWER_KEY || reason == BR_USB || reason == BR_WDT || reason == BR_WDT_BY_PASS_PWK
+#ifdef RTC_2SEC_REBOOT_ENABLE
+        || reason == BR_2SEC_REBOOT
+#endif //#ifdef RTC_2SEC_REBOOT_ENABLE
+        )
         rtc_bbpu_power_on();
 
     #ifdef PL_PROFILING
@@ -908,7 +956,11 @@ void platform_error_handler(void)
     print("%s preloader fatal error...\n", MOD);
     sec_util_brom_download_recovery_check();
     /* enter emergency download mode */
+
+    #if CFG_EMERGENCY_DL_SUPPORT
     platform_emergency_download(CFG_EMERGENCY_DL_TIMEOUT_MS);
+    #endif
+
     while(1);
 }
 

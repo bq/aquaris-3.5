@@ -281,7 +281,7 @@ void init_dsi(BOOL isDsiPoweredOn)
     
     // DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", "%s, line:%d\n", __func__, __LINE__);
     //initialize DSI_PHY
-    DSI_PHY_clk_switch(TRUE);
+    DSI_PHY_clk_switch(TRUE, lcm_params);
     DSI_PHY_TIMCONFIG(lcm_params);
 
     // DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", "%s, line:%d\n", __func__, __LINE__);
@@ -405,10 +405,11 @@ static DISP_STATUS dsi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
         config.bgROI.width = DISP_GetScreenWidth();
         config.bgROI.height = DISP_GetScreenHeight();
         config.bgColor = 0x0;	// background color
-        
-        config.pitch = DISP_GetScreenWidth()*2;
+
+        config.pitch = ALIGN_TO(DISP_GetScreenWidth(),32)*2;
         config.srcROI.x = 0;config.srcROI.y = 0;
-        config.srcROI.height= DISP_GetScreenHeight();config.srcROI.width= DISP_GetScreenWidth();
+        config.srcROI.height= DISP_GetScreenHeight();
+        config.srcROI.width= DISP_GetScreenWidth();
         config.ovl_config.source = OVL_LAYER_SOURCE_MEM; 
 
         config.ovl_config.layer = FB_LAYER;
@@ -445,6 +446,39 @@ static DISP_STATUS dsi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
         LCD_LayerSetPitch(FB_LAYER, ALIGN_TO(DISP_GetScreenWidth(),32) * 2);
         LCD_LayerEnable(FB_LAYER, TRUE);                    
 
+#if defined(MTK_M4U_EXT_PAGE_TABLE)
+        if(lcm_params->dsi.mode != CMD_MODE)
+        {
+            DSI_Wait_VDO_Idle();
+            disp_path_get_mutex();
+        }
+
+        disp_path_config(&config);
+        
+        #if 1
+        // Config FB_Layer port to be physical.
+        {
+            M4U_PORT_STRUCT portStruct;
+            
+            portStruct.ePortID = M4U_PORT_LCD_OVL;		   //hardware port ID, defined in M4U_PORT_ID_ENUM
+            portStruct.Virtuality = 1;
+            portStruct.Security = 0;
+            portStruct.domain = 3;			  //domain : 0 1 2 3
+            portStruct.Distance = 1;
+            portStruct.Direction = 0;
+            m4u_config_port(&portStruct);
+        }
+        // hook m4u debug callback function
+        m4u_set_tf_callback(M4U_CLNTMOD_DISP, &disp_m4u_dump_reg);
+        #endif
+
+        if(lcm_params->dsi.mode != CMD_MODE)
+        {
+            disp_path_release_mutex();
+            DSI_Start();
+        }
+        
+#else
         if(lcm_params->dsi.mode != CMD_MODE){
 
             #define TIMECNT  1000000
@@ -524,8 +558,13 @@ static DISP_STATUS dsi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
             m4u_set_tf_callback(M4U_CLNTMOD_DISP, &disp_m4u_dump_reg);
             #endif
         }
+#endif
+
     }
 #endif
+
+    printk("%s, config done\n", __func__);
+
     return DISP_STATUS_OK;
 }
 
@@ -541,7 +580,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             #if 0
                 // Switch bus to MIPI TX.
                 DSI_CHECK_RET(DSI_enable_MIPI_txio(TRUE));
-                DSI_PHY_clk_switch(1);
+                DSI_PHY_clk_switch(TRUE, lcm_params);
                 DSI_PHY_clk_setting(lcm_params->dsi.pll_div1, lcm_params->dsi.pll_div2, lcm_params->dsi.LANE_NUM);
                 DSI_CHECK_RET(DSI_PowerOn());
                 DSI_WaitForNotBusy();		
@@ -553,7 +592,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
 
             #else
                 #ifndef MT65XX_NEW_DISP
-                    DSI_PHY_clk_switch(1); 
+                    DSI_PHY_clk_switch(TRUE, lcm_params); 
                     DSI_CHECK_RET(DSI_PowerOn());
                     if(Need_Wait_ULPS())
                         Wait_ULPS_Mode();
@@ -574,7 +613,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
                     DSI_CHECK_RET(DSI_SleepOut());
 
                     // enter HS mode
-                    DSI_PHY_clk_switch(1); 
+                    DSI_PHY_clk_switch(TRUE, lcm_params); 
 
                     // enter wakeup
                     DSI_CHECK_RET(DSI_Wakeup());
@@ -610,7 +649,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             DSI_CHECK_RET(DSI_PowerOff());
 
             // disable mipi pll
-            DSI_PHY_clk_switch(0);
+            DSI_PHY_clk_switch(FALSE, lcm_params);
 
             // Switch bus to GPIO, then power level will be decided by GPIO setting.
             DSI_CHECK_RET(DSI_enable_MIPI_txio(FALSE));
@@ -621,7 +660,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             #if 0
                 // Switch bus to MIPI TX.
                 DSI_CHECK_RET(DSI_enable_MIPI_txio(TRUE));
-                DSI_PHY_clk_switch(1);
+                DSI_PHY_clk_switch(TRUE, lcm_params);
                 DSI_PHY_clk_setting(lcm_params->dsi.pll_div1, lcm_params->dsi.pll_div2, lcm_params->dsi.LANE_NUM);
                 DSI_CHECK_RET(DSI_PowerOn());			
                 DSI_clk_ULP_mode(0);			
@@ -632,7 +671,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
                 LCD_CHECK_RET(LCD_PowerOn());
             #else
                 #ifndef MT65XX_NEW_DISP
-                    DSI_PHY_clk_switch(1); 
+                    DSI_PHY_clk_switch(TRUE, lcm_params); 
                     DSI_CHECK_RET(DSI_PowerOn());
                     if(Need_Wait_ULPS())
                         Wait_ULPS_Mode();
@@ -654,7 +693,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
                     DSI_CHECK_RET(DSI_SleepOut());
                     
                     // enter HS mode
-                    DSI_PHY_clk_switch(1); 
+                    DSI_PHY_clk_switch(TRUE, lcm_params); 
 
                     // enter wakeup
                     DSI_CHECK_RET(DSI_Wakeup());
@@ -700,7 +739,7 @@ static DISP_STATUS dsi_enable_power(BOOL enable)
             DSI_CHECK_RET(DSI_PowerOff());
 
             // disable mipi pll
-            DSI_PHY_clk_switch(0);
+            DSI_PHY_clk_switch(FALSE, lcm_params);
 
             // Switch bus to GPIO, then power level will be decided by GPIO setting.
             DSI_CHECK_RET(DSI_enable_MIPI_txio(FALSE));
